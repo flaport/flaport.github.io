@@ -1,3 +1,7 @@
+/* External links */
+a.external:after {
+    content: url(/static/external-link.svg);
+}
 /* Fonts */
 @font-face {
     font-family: 'Nunito';
