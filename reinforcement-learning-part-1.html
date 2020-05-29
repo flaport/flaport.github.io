@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    
+    <title>Flaport.net | Reinforcement learning from the ground up: part 1: tic-tac-toe</title>
+    
+    <link rel="shortcut icon" type="image/png" href="" />
+    <link rel="stylesheet" href="/static/css/normalize.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/basic.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/fonts.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/colors.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/main.css" type="text/css" />
+    
+    
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [
+            ["$", "$"],
+            ["\\(", "\\)"],
+          ],
+        },
+      };
+    </script>
+    <script
+      id="MathJax-script"
+      async
+      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+    ></script>
+    <script
+      crossorigin="anonymous"
+      integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA="
+      src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"
+    ></script>
+  </head>
+  <body>
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="fa" align="right">
+            &nbsp;<input type="checkbox" id="darkmodetoggle" />
+          </div>
+          <div class="body" role="main">
+            
+    <h1>Reinforcement learning from the ground up: part 1: tic-tac-toe</h1>
+    <p>
+    author: Flaport&nbsp;&middot;
+    published: <a class="date">2019-11-29T12:12:07Z</a>&nbsp;&middot;
+    
+    tags:
+    
+        <a href="/tags/machine-learning.html">machine-learning</a>&nbsp;
+    
+        <a href="/tags/reinforcement-learning.html">reinforcement-learning</a>&nbsp;
+    
+        <a href="/tags/python.html">python</a>&nbsp;
+    
+    </p>
+    <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>As a first example to reinforcement learning, we'll make our computer learn by itself how to play tic-tac-toe. As one of the most simple 2 player games, tic-tac-toe is ideal to get started with reinforcement learning, while still being more interesting that learning to play a single player game.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p><img src="static/img/reinforcement-learning/tictactoe.svg" width=200></p>
+<p><del><strong>The AI created in this series can now be challenged <a href="/#.html">here</a>!</strong></del> [offline at the moment]</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Index">Index<a class="anchor-link" href="#Index">&#182;</a></h2><ul>
+<li>part 1 <strong>(this post)</strong>: We create the game environment and a simple unbeatable AI based on <em>traditional</em> Q-learning 🤖.</li>
+<li><a href="/reinforcement-learning-part-2.html">part 2</a>: We modify our AI to utilize a neural network: <em>deep</em> Q-learning 👾.</li>
+</ul>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[1]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="c1">#!</span>
+<span class="c1"># standard library:</span>
+<span class="kn">import</span> <span class="nn">json</span>  <span class="c1"># to store learned state</span>
+
+<span class="c1"># 3rd party:</span>
+<span class="kn">import</span> <span class="nn">tqdm</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="c1"># settings</span>
+<span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># set seed for reproducible results</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="The-Game">The Game<a class="anchor-link" href="#The-Game">&#182;</a></h2><p>First we'll need to create an environment to play te game. We'll represent this environment by the <code>TicTacToe</code> class.</p>
+<p>A <code>TicTacToe</code> object stores the <em>2D state</em> of the game, which is represented as a 2D numpy array with 9 elements, such that the positions of the playing board are labeled as follows. Each of those labels represents a possible <em>action</em> an player can take.</p>
+<div class="highlight"><pre><span></span><span class="mi">0</span>   <span class="mi">1</span>   <span class="mi">2</span>
+<span class="mi">3</span>   <span class="mi">4</span>   <span class="mi">5</span>
+<span class="mi">6</span>   <span class="mi">7</span>   <span class="mi">8</span>
+</pre></div>
+<p>Furthermore, each position on the board can be in 3 differents states. First there is the empty state (a position in the board where nobody has placed a mark yet) denoted by a <code>0</code>. Then there is the <code>O</code>-state: the state where <code>player1</code> has placed a mark denoted by a <code>1</code>. Finally there is the <code>X</code>-state, denoted by a <code>2</code>: the <code>state</code> where <code>player2</code> has placed a mark.</p>
+<p>An example state of the board at a certain time in the game can for example look like this:</p>
+<div class="highlight"><pre><span></span><span class="o">.</span>   <span class="n">X</span>   <span class="n">O</span>       <span class="mi">0</span>   <span class="mi">2</span>   <span class="mi">1</span>
+<span class="o">.</span>   <span class="n">O</span>   <span class="o">.</span>  <span class="o">--&gt;</span>  <span class="mi">0</span>   <span class="mi">1</span>   <span class="mi">0</span> 
+<span class="n">X</span>   <span class="n">O</span>   <span class="n">X</span>       <span class="mi">2</span>   <span class="mi">1</span>   <span class="mi">2</span>
+</pre></div>
+<p>In addition to these 9 numbers, the current player's <em>turn</em> will also be kept track of. The turn index can thus be either <code>1</code> or <code>2</code>, or <code>0</code> when the game is over. The <em>turn</em> together with the <em>2D state</em> make up the full <em>state</em> of the game.</p>
+<p>Apart from the state of the game, the <code>TicTacToe</code> object will also keep a reference to the two players playing the game, so it can ask for an action from either player whenever it's the specific <code>player</code>'s turn. A <code>player</code> is asked to choose an <code>action</code> (move) by its own <code>get_action</code> method.</p>
+<p>After the <code>action</code> is asked from a <code>player</code>, the <code>action</code> is validated and executed by the <code>play_turn</code> method of the <code>TicTacToe</code> instance. 
+If the action is invalid (for example when choosing a square that is already taken), the player loses. If the <code>action</code> results in a line of three equal marks, the current <code>player</code> wins. This would result in a <code>+1</code> reward if <code>player1</code> wins and a <code>-1</code> reward if <code>player2</code> wins (they have opposite goals, so they receive opposite rewards; more on the reward system later). In all other cases no rewards will be given as no <code>player</code> has won (yet).</p>
+<p>Finally, the full <code>state</code>, <code>action</code> and resulting <code>next_state</code> and <code>reward</code> are given to the player's <code>learn</code> method, such that the player can update it's policy according to the reward received, which will make it learn from its mistakes.</p>
+<p>Finally, it is useful to have a way to visualize the game each turn. The game <code>state</code> can be visualized by setting the <code>visualize</code> flag to <code>True</code>.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[2]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">TicTacToe</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot; Tic-Tac-Toe Game &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">player1</span><span class="p">,</span> <span class="n">player2</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; The Tic-Tac-Toe game takes two players and pitches them against each other. &quot;&quot;&quot;</span>
+        <span class="c1"># pitch players against each other</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">players</span> <span class="o">=</span> <span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="n">player1</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="n">player2</span><span class="p">}</span>
+
+        <span class="c1"># reward for each outcome of the game (tie, player1 wins, player2 wins)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reward</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">play</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">visualize</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; play a full game &quot;&quot;&quot;</span>
+        <span class="n">turn</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">state2d</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="p">(</span><span class="n">state2d</span><span class="p">,</span> <span class="n">turn</span><span class="p">)</span>  <span class="c1"># full state of the game</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">9</span><span class="p">):</span>
+            <span class="n">current_player</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">players</span><span class="p">[</span><span class="n">turn</span><span class="p">]</span>
+            <span class="n">action</span> <span class="o">=</span> <span class="n">current_player</span><span class="o">.</span><span class="n">get_action</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+            <span class="n">next_state</span><span class="p">,</span> <span class="n">reward</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">play_turn</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">action</span><span class="p">)</span>
+            <span class="n">current_player</span><span class="o">.</span><span class="n">learn</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">action</span><span class="p">,</span> <span class="n">next_state</span><span class="p">,</span> <span class="n">reward</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">visualize</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">visualize_state</span><span class="p">(</span><span class="n">next_state</span><span class="p">,</span> <span class="n">turn</span><span class="p">)</span>
+
+            <span class="p">(</span><span class="n">state2d</span><span class="p">,</span> <span class="n">turn</span><span class="p">)</span> <span class="o">=</span> <span class="n">state</span> <span class="o">=</span> <span class="n">next_state</span>
+
+            <span class="k">if</span> <span class="n">turn</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">break</span>
+
+    <span class="k">def</span> <span class="nf">play_turn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">action</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; execute a specific move chosen by the current player and </span>
+<span class="sd">        check if it&#39;s a winning/losing move. &quot;&quot;&quot;</span>
+        <span class="c1"># retrieve states</span>
+        <span class="n">state2d</span><span class="p">,</span> <span class="n">turn</span> <span class="o">=</span> <span class="n">state</span>
+        <span class="n">next_state2d</span> <span class="o">=</span> <span class="n">state2d</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">next_turn</span> <span class="o">=</span> <span class="n">turn</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="c1"># transform action in two indices</span>
+        <span class="n">ax</span><span class="p">,</span> <span class="n">ay</span> <span class="o">=</span> <span class="n">action</span> <span class="o">//</span> <span class="mi">3</span><span class="p">,</span> <span class="n">action</span> <span class="o">%</span> <span class="mi">3</span>
+
+        <span class="c1"># check if board is already occupied at location</span>
+        <span class="k">if</span> <span class="n">state2d</span><span class="p">[</span><span class="n">ax</span><span class="p">,</span> <span class="n">ay</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># invalid move</span>
+            <span class="n">next_state2d</span><span class="o">.</span><span class="n">fill</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">next_state</span> <span class="o">=</span> <span class="p">(</span><span class="n">next_state2d</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>  <span class="c1"># next_turn == 0 -&gt; game over</span>
+            <span class="k">return</span> <span class="n">next_state</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reward</span><span class="p">[</span><span class="n">next_turn</span><span class="p">]</span>  <span class="c1"># next player wins</span>
+
+        <span class="c1"># apply action</span>
+        <span class="n">next_state2d</span><span class="p">[</span><span class="n">ax</span><span class="p">,</span> <span class="n">ay</span><span class="p">]</span> <span class="o">=</span> <span class="n">turn</span>
+
+        <span class="c1"># check if the action resulted in a winner</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="n">next_state2d</span> <span class="o">==</span> <span class="n">turn</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">mask</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+            <span class="ow">or</span> <span class="p">(</span><span class="n">mask</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+            <span class="ow">or</span> <span class="p">(</span><span class="n">mask</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+            <span class="ow">or</span> <span class="p">(</span><span class="n">mask</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+            <span class="ow">or</span> <span class="p">(</span><span class="n">mask</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+            <span class="ow">or</span> <span class="p">(</span><span class="n">mask</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+            <span class="ow">or</span> <span class="p">(</span><span class="n">mask</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+            <span class="ow">or</span> <span class="p">(</span><span class="n">mask</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="ow">and</span> <span class="n">mask</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+        <span class="p">):</span>
+            <span class="n">next_state</span> <span class="o">=</span> <span class="p">(</span><span class="n">next_state2d</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>  <span class="c1"># next_turn == 0 -&gt; game over</span>
+            <span class="k">return</span> <span class="n">next_state</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reward</span><span class="p">[</span><span class="n">turn</span><span class="p">]</span>  <span class="c1"># current player wins</span>
+
+        <span class="c1"># if the playing board is full, but no winner found: tie</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">next_state2d</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>  <span class="c1"># final tie.</span>
+            <span class="n">next_state</span> <span class="o">=</span> <span class="p">(</span><span class="n">next_state2d</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>  <span class="c1"># next_turn == 0 -&gt; game over</span>
+            <span class="k">return</span> <span class="n">next_state</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reward</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># no winner</span>
+
+        <span class="c1"># if no move has resulted in a winner: next player&#39;s turn.</span>
+        <span class="n">next_state</span> <span class="o">=</span> <span class="p">(</span><span class="n">next_state2d</span><span class="p">,</span> <span class="n">next_turn</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">next_state</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reward</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># no winner yet</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">visualize_state</span><span class="p">(</span><span class="n">next_state</span><span class="p">,</span> <span class="n">turn</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; show the resulting game state after a player&#39;s turn &quot;&quot;&quot;</span>
+        <span class="n">next_state2d</span><span class="p">,</span> <span class="n">next_turn</span> <span class="o">=</span> <span class="n">next_state</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;player </span><span class="si">{</span><span class="n">turn</span><span class="si">}</span><span class="s2">&#39;s turn:&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">next_state2d</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span> <span class="ow">and</span> <span class="n">turn</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;[invalid state]</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="nb">str</span><span class="p">(</span><span class="n">next_state2d</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;[[&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; [&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;]]&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;]&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;0&quot;</span><span class="p">,</span> <span class="s2">&quot;.&quot;</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="s2">&quot;O&quot;</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;2&quot;</span><span class="p">,</span> <span class="s2">&quot;X&quot;</span><span class="p">)</span>
+                <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Random-Player">Random Player<a class="anchor-link" href="#Random-Player">&#182;</a></h2><p><img src="static/img/reinforcement-learning/dice.svg" width=200></p>
+<p>Let's first define the most stupid player of them all: a random player.
+The following player will always return a random index corresponding to one of the empty positions in the board:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[3]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">RandomPlayer</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot; The random player will return a random action from the set of allowed actions&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">get_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="n">state2d</span><span class="p">,</span> <span class="n">turn</span> <span class="o">=</span> <span class="n">state</span>
+        <span class="n">possible_actions</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">state2d</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">action</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">possible_actions</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">action</span>
+
+    <span class="k">def</span> <span class="nf">learn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">action</span><span class="p">,</span> <span class="n">next_state</span><span class="p">,</span> <span class="n">reward</span><span class="p">):</span>
+        <span class="k">pass</span>  <span class="c1"># a random player does not learn from its mistakes</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Let's-play-a-game!">Let's play a game!<a class="anchor-link" href="#Let's-play-a-game!">&#182;</a></h2><p>Let's pitch two of those random players against each other!</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[4]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">player1</span> <span class="o">=</span> <span class="n">RandomPlayer</span><span class="p">()</span>
+<span class="n">player2</span> <span class="o">=</span> <span class="n">RandomPlayer</span><span class="p">()</span>
+<span class="n">game</span> <span class="o">=</span> <span class="n">TicTacToe</span><span class="p">(</span><span class="n">player1</span><span class="p">,</span> <span class="n">player2</span><span class="p">)</span>
+<span class="n">game</span><span class="o">.</span><span class="n">play</span><span class="p">(</span><span class="n">visualize</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>player 1&#39;s turn:
+. . .
+. . O
+. . .
+
+
+player 2&#39;s turn:
+. . .
+X . O
+. . .
+
+
+player 1&#39;s turn:
+. . .
+X . O
+O . .
+
+
+player 2&#39;s turn:
+X . .
+X . O
+O . .
+
+
+player 1&#39;s turn:
+X . O
+X . O
+O . .
+
+
+player 2&#39;s turn:
+X . O
+X . O
+O . X
+
+
+player 1&#39;s turn:
+X . O
+X O O
+O . X
+
+
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>obviously, this is not very interesting. We need a smarter kind of player:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="A-smarter-player">A smarter player<a class="anchor-link" href="#A-smarter-player">&#182;</a></h2><p>But how do we define such a smarter <code>player</code>? We could probably just code a perfect AI ourselves by coding out some rules that the <code>player</code> has to take in each specific position of the board. And for tic-tac-toe, this would probably not be very difficult. However, we'd like a more general approach: enter <code>Q</code> learning.</p>
+<p>In general, <code>Q</code> learning works af follows: An <code>Agent</code> plays the game according to a certain policy <code>π</code>. This policy <code>π</code> is such that it chooses the <code>action</code> with the maximal <code>Q</code> value associated with it for a specific <code>state</code> of the game. This <code>Q</code> value can be found in a lookup table: the <code>Q</code> table, where a different <code>Q</code> value is associated with each <code>state</code> of the game and the possible <code>action</code>s one can take for this specific <code>state</code>. Mathematically, one can express this as follows:
+\begin{align*}
+    \texttt{action} &amp;= \pi(\texttt{state}) = \text{argmax}_{action} Q(\texttt{state},~\texttt{action})
+\end{align*}
+Intuitively, each <code>Q</code> value can thus vaguely be linked to the probability of a certain <code>player</code> winning the game after playing a certain <code>action</code> when the game is in a certain <code>state</code>.</p>
+<p>However, we will pitch two Agents against each other. If we assume a higher <code>Q</code> value to be associated to a higher chance of <code>player1</code> winning, the policy for <code>player2</code> will have to be the opposite of the policy of <code>player1</code>. <code>player2</code>'s policy will thus try to choose the <code>action</code> with the minimal <code>Q</code> value associated to it. This way of pitching two players against each other while one tries to optimize the objective function and the other tries to minimize it is also known as the <code>minimax</code> algorithm.</p>
+\begin{align*}
+    \texttt{player1} &amp;: \texttt{action} = \pi(\texttt{state}) = \text{argmax}_{action} Q(\texttt{state},~\texttt{action})\\
+    \texttt{player2} &amp;: \texttt{action} = \pi(\texttt{state}) = \text{argmin}_{action} Q(\texttt{state},~\texttt{action})
+\end{align*}<p>However, the above does not fully describe how the <code>Q</code> table is formed. We need to define a way to update the <code>Q</code> values after a certain decision has been made. For this, the Bellman equation can be used, which basically describes that the Q-value at the current state of the game should be equal to the reward received at this stage of the game plus a discounted Q-value at the next state of the game.
+\begin{align*}
+    Q(\texttt{state},~\texttt{action}) = \texttt{reward} + \texttt{discount_factor} \cdot Q(\texttt{next-state},~\texttt{next-action})
+\end{align*}
+Which states that for a <em>perfect</em> <code>Q</code> table, the expected <code>Q</code> value of the current <code>state</code> will be equal the the <code>Q</code> value of the next <code>state</code> and next <code>action</code> discounted by a <code>discount_factor</code> plus a possible reward obtained by performing chosen the <code>action</code>. However, we start with an imperfect <code>Q</code> table, which means that at each timestep, there will be an error <code>δ</code> between the left hand side and the right hand side of the Bellman equation:
+\begin{align*}
+    \delta &amp;= Q(\texttt{state},~\texttt{action}) - (\texttt{reward} + \texttt{discount_factor} \cdot Q(\texttt{next-state},~\texttt{next-action}))
+\end{align*}
+<code>player1</code> has the policy to <em>maximize</em> <code>Q</code>, while <code>player2</code> will have the policy to <em>minimize</em> <code>Q</code> and vice versa, which yields for the error on the <code>Q</code> values for each of the players:
+\begin{align*}
+    \texttt{player1} &amp;: \delta = Q(\texttt{state},~\texttt{action}) - (\texttt{reward} + \texttt{discount_factor} \cdot \text{min}_{\texttt{action}} Q(\texttt{next-state},~\texttt{action})) \\
+    \texttt{player2} &amp;: \delta = Q(\texttt{state},~\texttt{action}) - (\texttt{reward} + \texttt{discount_factor} \cdot \text{max}_{\texttt{action}} Q(\texttt{next-state},~\texttt{action}))
+\end{align*}
+Note that the error on the Q-value for player 1 uses the policy of player 2 [<code>min</code>]. This is to be expected, as this policy appears in the discounted Q-value of the next state, which is determined by the other player.</p>
+<p>This error can then be used in conjunction with a <code>learning_rate</code> to update the <code>Q</code> values iteratively at every step of the game.</p>
+<p>Let's have a look how this can be implemented:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Q-table">Q table<a class="anchor-link" href="#Q-table">&#182;</a></h3><p>As discussed above, the Q table is just a table (numpy array) that returns a Q value for each state of the game and for each action taken. A tic-tac-toe game consists of 9 squares, each of which can be in 3 different states, totalling 3^9 different states (in reality, there are less allowed states possible; 3^9 is an upper bound). We can convert each state to a unique integer to index the qtable. Indexing (calling in this case) the QTable with a state results in a row of the QTable containing 9 qvalues corresponding to the 9 possible actions one can take for each state. Yes, there are 9 possible actions possible at <strong>each</strong> state, even if there are already a few squares taken: the game is programmed in such a way that an invalid move will make you lose, obviously this design choice will make training more difficult but also more general. Note that we only use the <em>2D state</em> of the game as key for the Q-table as this is enough to create a unique key to index the underlying table.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[5]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">QTable</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_qtable</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">3</span> <span class="o">**</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">9</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_state_key_vector</span> <span class="o">=</span> <span class="mi">3</span> <span class="o">**</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">9</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state2d</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_qtable</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">state2d</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_key_vector</span><span class="p">))]</span>
+
+    <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">filename</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.csv&quot;</span><span class="p">):</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span> <span class="o">+</span> <span class="s2">&quot;.csv&quot;</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">savetxt</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_qtable</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s2">&quot;,&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">filename</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.csv&quot;</span><span class="p">):</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span> <span class="o">+</span> <span class="s2">&quot;.csv&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_qtable</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">loadtxt</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s2">&quot;,&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Agent">Agent<a class="anchor-link" href="#Agent">&#182;</a></h3><p><img src="static/img/reinforcement-learning/robot.png" width=200></p>
+<p>A reinforcement agent plays the game by playing a random action with with probability Ɛ. Alternatively, the Agent will consult its Q-table with probability (1-Ɛ) to play the action with the optimal Q-value associated to it. This is the <em>explore</em>-<em>exploit</em> principle. During training of the Agent the Ɛ will be quite high, as one want the agent to learn each corner case of the game. During evaluation, the Ɛ will be set to zero, forcing the agent to play its best game.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[6]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">Agent</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot; The Agent plays the game by playing a move corresponding to the optimal Q-value &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">qtable</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">discount_factor</span><span class="o">=</span><span class="mf">0.9</span>
+    <span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; A new Agent can be given some optional parameters to tune how fast it learns</span>
+<span class="sd">        </span>
+<span class="sd">        Args:</span>
+<span class="sd">            qtable: QTable=None: the initial Q-table to start with. </span>
+<span class="sd">            epsilon: float=0.2: the chance the Agent will explore a random move</span>
+<span class="sd">                               (in stead of choosing the optimal choice according to the Q table)</span>
+<span class="sd">            learning_rate: float=0.3: the rate at which the Agent learns from its games</span>
+<span class="sd">            discount_factor: float=0.9: the rate at which the final reward gets discounted</span>
+<span class="sd">                                        for when rating previous moves.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">qtable</span> <span class="o">=</span> <span class="n">QTable</span><span class="p">()</span> <span class="k">if</span> <span class="n">qtable</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">qtable</span>
+
+        <span class="c1"># the speed at which the Qvalues get updated</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">learning_rate</span> <span class="o">=</span> <span class="n">learning_rate</span>
+
+        <span class="c1"># the discount factor of future rewards</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">discount_factor</span> <span class="o">=</span> <span class="n">discount_factor</span>
+
+        <span class="c1"># the chance of executing a random action</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">epsilon</span> <span class="o">=</span> <span class="n">epsilon</span>
+
+    <span class="k">def</span> <span class="nf">random_action</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; get a random action &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">best_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; get the best values according to the current Q table &quot;&quot;&quot;</span>
+        <span class="n">state2d</span><span class="p">,</span> <span class="n">turn</span> <span class="o">=</span> <span class="n">state</span>
+        <span class="n">argminmax</span> <span class="o">=</span> <span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">}[</span><span class="n">turn</span><span class="p">]</span>
+        <span class="n">qvalues</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">qtable</span><span class="p">(</span><span class="n">state2d</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">argminmax</span><span class="p">(</span><span class="n">qvalues</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; perform an action according to the state on the game board &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">()</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">epsilon</span><span class="p">:</span>
+            <span class="c1"># Choose action (random with chance of epsilon; best action otherwise.)</span>
+            <span class="n">action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">random_action</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># get qvalues for current state of the game</span>
+            <span class="n">action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">best_action</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">action</span>
+
+    <span class="k">def</span> <span class="nf">learn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">action</span><span class="p">,</span> <span class="n">next_state</span><span class="p">,</span> <span class="n">reward</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; learn from the current state and action taken. &quot;&quot;&quot;</span>
+        <span class="n">state2d</span><span class="p">,</span> <span class="n">turn</span> <span class="o">=</span> <span class="n">state</span>
+        <span class="n">next_state2d</span><span class="p">,</span> <span class="n">next_turn</span> <span class="o">=</span> <span class="n">next_state</span>
+        <span class="k">if</span> <span class="n">next_turn</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># game finished</span>
+            <span class="n">expected_qvalue_for_action</span> <span class="o">=</span> <span class="n">reward</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">next_qvalues</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">qtable</span><span class="p">(</span><span class="n">next_state2d</span><span class="p">)</span>
+            <span class="n">minmax</span> <span class="o">=</span> <span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="nb">max</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="nb">min</span><span class="p">}[</span><span class="n">next_turn</span><span class="p">]</span>
+            <span class="n">expected_qvalue_for_action</span> <span class="o">=</span> <span class="n">reward</span> <span class="o">+</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">discount_factor</span> <span class="o">*</span> <span class="n">minmax</span><span class="p">(</span><span class="n">next_qvalues</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="c1"># update qvalues:</span>
+        <span class="n">qvalues</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">qtable</span><span class="p">(</span><span class="n">state2d</span><span class="p">)</span>
+        <span class="n">qvalues</span><span class="p">[</span><span class="n">action</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">learning_rate</span> <span class="o">*</span> <span class="p">(</span>
+            <span class="n">expected_qvalue_for_action</span> <span class="o">-</span> <span class="n">qvalues</span><span class="p">[</span><span class="n">action</span><span class="p">]</span>
+        <span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Train">Train<a class="anchor-link" href="#Train">&#182;</a></h2><p><img src="static/img/reinforcement-learning/train.jpg" width=300></p>
+<p>Now the <code>Agent</code> is defined, it's time to train it! Training is as simple as just playing a 'bunch' of games (about 10,000,000). The <code>Agent</code> will learn automatically from its <code>learn</code> method.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[7]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="c1"># initialize</span>
+<span class="n">N</span> <span class="o">=</span> <span class="mi">10_000_000</span>  <span class="c1"># Number of training episodes</span>
+<span class="n">qtable</span> <span class="o">=</span> <span class="n">QTable</span><span class="p">()</span>  <span class="c1"># share Q for faster training</span>
+<span class="n">player</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">qtable</span><span class="o">=</span><span class="n">qtable</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.6</span><span class="p">)</span>
+<span class="n">game</span> <span class="o">=</span> <span class="n">TicTacToe</span><span class="p">(</span><span class="n">player</span><span class="p">,</span> <span class="n">player</span><span class="p">)</span>  <span class="c1"># let player play against itself</span>
+
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">trange</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
+    <span class="n">game</span><span class="o">.</span><span class="n">play</span><span class="p">()</span>
+
+<span class="n">qtable</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;qtable.csv&quot;</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stderr output_text">
+<pre>100%|██████████| 10000000/10000000 [26:55&lt;00:00, 6189.38it/s]
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Let's-play-another-game!">Let's play another game!<a class="anchor-link" href="#Let's-play-another-game!">&#182;</a></h2><p>Let the trained agent play against itself one final time.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[8]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">player</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">epsilon</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>  <span class="c1"># epsilon=0 -&gt; no random guesses</span>
+<span class="n">player</span><span class="o">.</span><span class="n">qtable</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;qtable.csv&quot;</span><span class="p">)</span>
+<span class="n">game</span> <span class="o">=</span> <span class="n">TicTacToe</span><span class="p">(</span><span class="n">player</span><span class="p">,</span> <span class="n">player</span><span class="p">)</span>  <span class="c1"># let player play against itself</span>
+
+<span class="c1"># play</span>
+<span class="n">game</span><span class="o">.</span><span class="n">play</span><span class="p">(</span><span class="n">visualize</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>player 1&#39;s turn:
+. . .
+. O .
+. . .
+
+
+player 2&#39;s turn:
+X . .
+. O .
+. . .
+
+
+player 1&#39;s turn:
+X . .
+O O .
+. . .
+
+
+player 2&#39;s turn:
+X . .
+O O X
+. . .
+
+
+player 1&#39;s turn:
+X . O
+O O X
+. . .
+
+
+player 2&#39;s turn:
+X . O
+O O X
+X . .
+
+
+player 1&#39;s turn:
+X . O
+O O X
+X O .
+
+
+player 2&#39;s turn:
+X X O
+O O X
+X O .
+
+
+player 1&#39;s turn:
+X X O
+O O X
+X O O
+
+
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>We see that the game ends in a tie. This is to be expected, as two perfect tic-tac-toe players playing against each other will always draw.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>The Q-table for the trained Agent can be downloaded in csv format <a href="/qtable.html">here</a> (availability not guarenteed).</p>
+<p><strong><a href="/reinforcement-learning-part-2.html">Go to part 2 of the series</a></strong></p>
+
+</div>
+</div>
+</div>
+ 
+
+
+
+<script data-isso="//isso.flaport.net/" src="//isso.flaport.net/js/embed.min.js"></script>
+<section id="isso-thread"></section>
+
+
+          </div>
+        </div>
+      </div>
+
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+          <h1 class="logo"><a href="/">Flaport.net</a></h1>
+
+          <h3>Blog</h3>
+          <ul>
+            <li class="toctree-l1">
+              <a class="reference internal" href="/">Home</a>
+            </li>
+            
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/reinforcement-learning-part-2.html">Previous&nbsp;Post</a>
+            </li>
+            
+            <h3 style="padding-top: 1em;">Tags</h3>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/machine-learning.html">machine-learning</a> (3)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/python.html">python</a> (3)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/linux.html">linux</a> (2)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/reinforcement-learning.html">reinforcement-learning</a> (2)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/yolo.html">yolo</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/tui.html">tui</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/vps.html">vps</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/productivity.html">productivity</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/computer-vision.html">computer-vision</a> (1)
+            </li>
+            
+            <h3 style="padding-top: 1em;">Projects</h3>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://photontorch.com"
+                >Photontorch</a
+              >
+            </li>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://github.com/flaport/fdtd"
+                >Python&nbsp;3D&nbsp;FDTD</a
+              >
+            </li>
+            <h3 style="padding-top: 1em;">External links</h3>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://github.com/flaport"
+                >GitHub&nbsp;<span class="fa">&nbsp;</span></a
+              >
+            </li>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://twitter.com/florislaporte"
+                >Twitter&nbsp;<span class="fa">&nbsp;</span></a
+              >
+            </li>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://linkedin.com/in/florislaporte"
+                >Linked&nbsp;<span class="fa">&nbsp;</span></a
+              >
+            </li>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://www.photonics.intec.ugent.be/contact/people.asp?ID=424"
+                >Academic&nbsp;Profile</a
+              >
+            </li>
+          </ul>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <script src="/static/js/localdates.js"></script>
+    <script src="/static/js/externallinks.js"></script>
+    <script src="/static/js/toggledarkmode.js"></script>
+  </body>
+</html>

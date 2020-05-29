@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    
+    <title>Flaport.net | SSH via a relay server</title>
+    
+    <link rel="shortcut icon" type="image/png" href="" />
+    <link rel="stylesheet" href="/static/css/normalize.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/basic.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/fonts.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/colors.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/main.css" type="text/css" />
+    
+    
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [
+            ["$", "$"],
+            ["\\(", "\\)"],
+          ],
+        },
+      };
+    </script>
+    <script
+      id="MathJax-script"
+      async
+      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+    ></script>
+    <script
+      crossorigin="anonymous"
+      integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA="
+      src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"
+    ></script>
+  </head>
+  <body>
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="fa" align="right">
+            &nbsp;<input type="checkbox" id="darkmodetoggle" />
+          </div>
+          <div class="body" role="main">
+            
+    <h1>SSH via a relay server</h1>
+    <p>
+    author: Flaport&nbsp;&middot;
+    published: <a class="date">2020-03-31T16:47:48Z</a>&nbsp;&middot;
+    
+    tags:
+    
+        <a href="/tags/linux.html">linux</a>&nbsp;
+    
+        <a href="/tags/vps.html">vps</a>&nbsp;
+    
+    </p>
+    <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>I often connect via SSH to my desktop computer at my desk at University. However, this computer is behind a firewall and I cannot connect to it from my laptop directly. Luckily I have my Virtual Private Server (VPS) where I - among other things - serve this blog. I use this VPS as a relay server to access my desktop from anywhere with my laptop (and vice versa).</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Relay-server?">Relay server?<a class="anchor-link" href="#Relay-server?">&#182;</a></h2><p>When I talk about a relay server, I mean a situation like the following:</p>
+<p><img src="static/img/ssh-via-relay-server/relayssh.png" alt="ssh-relay"></p>
+<p>Both my laptop and desktop computer can ssh into the VPS, but the desktop is behind a firewall and the laptop often changes ip adresses. To easily enable an ssh connection between the laptop and the desktop a connection through the VPS can offer a solution. So... How?</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="1.-Desktop-&#62270;-VPS">1. Desktop <span class="fa">&#62270;</span> VPS<a class="anchor-link" href="#1.-Desktop-&#62270;-VPS">&#182;</a></h2><p>First, the desktop needs to allow incoming ssh connections (you might need to install OpenSSH). Usually this is done by enabling and starting a <code>systemd</code> service:</p>
+
+<pre><code>desktop-user@desktop$    sudo systemctl enable sshd
+desktop-user@desktop$    sudo systemctl start sshd</code></pre>
+<p>Then, the desktop needs to make a permanent connection with the VPS:</p>
+
+<pre><code>desktop-user@desktop$    ssh -R 2222:localhost:22 vps-user@vps-ip</code></pre>
+<p>Apart from connecting to the vps, we also forward port 22 - the standard ssh port - to port 2222 on the VPS. We'll come back to that later.</p>
+<p>You could background this process and be done with it. However, I prefer something more robust. First create a new ssh id (just keep <code>id_rsa</code> as filename and don't create a password for the key) and then copy it to the vps.</p>
+
+<pre><code>desktop-user@desktop$    ssh-keygen
+desktop-user@desktop$    ssh-copy-id vps-user@vps-ip</code></pre>
+<p>After generating and copying your SSH ID to the VPS, you should be able to ssh into the VPS without a password (you might have set this up already when configuring the VPS). Double check this:</p>
+
+<pre><code>desktop-user@desktop$    ssh vps-user@vps-ip</code></pre>
+<p>Then, use a tool like <code>autossh</code> (you might need to install it), which will attempt to restart the connection whenever the connection breaks for some reason.</p>
+
+<pre><code>desktop-user@desktop$    autossh -M 0 -N -R 2222:localhost:22  -i /home/flaport/.ssh/id_rsa -o "ServerAliveInterval 30" -o "ServerAliveCountMax 10" vps-user@vps-ip</code></pre>
+<p>And while we're at it, to make it even more robust, we can create a <code>systemd</code> service for this:</p>
+
+<pre><code>file: /etc/systemd/system/sshtunnel.service
+
+    [Unit]
+    Description=Permanent ssh-tunnel to a VPS
+    After=network-online.target
+
+    [Service]
+    User=flaport
+    ExecStart=/usr/bin/autossh -M 0 -N -R 2223:localhost:22  -i /home/flaport/.ssh/id_rsa -o "ServerAliveInterval 30" -o "ServerAliveCountMax 10" vps-user@vps-ip
+    Restart=always
+    RestartSec=5
+
+    [Install]
+    WantedBy=multi-user.target</code></pre>
+<p>Enable and start it:</p>
+
+<pre><code>desktop-user@desktop$    sudo systemctl enable sshtunnel
+desktop-user@desktop$    sudo systemctl start sshtunnel</code></pre>
+<p>Now, the desktop will create a permanent ssh-tunnel to the vps. The ssh-tunnel will be started at boot (if you enabled the service) and it will be restarted whenever it fails. Perfect!</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="2.-Laptop-&#62270;-VPS">2. Laptop <span class="fa">&#62270;</span> VPS<a class="anchor-link" href="#2.-Laptop-&#62270;-VPS">&#182;</a></h2><p>Connecting the laptop to the VPS works the same as connecting the desktop to the VPS. The discussion from above can largely be repeated (change port 2222 to another port number though). However, when you're not interested in enabling connections from the desktop to the laptop, large parts of the above section can be skipped for the laptop. This is what remains:</p>
+
+<pre><code>laptop-user@laptop$    ssh-keygen            # again, don't set a password and just use id_rsa as id
+laptop-user@laptop$    ssh-copy-id vps-id    # copy the id_rsa ssh-id to the vps
+laptop-user@laptop$    ssh vps-id            # check if you can login into the vps without a password.</code></pre>
+<p>Great this works! Now the magic begins:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="3.-Laptop-&#62270;-Desktop">3. Laptop <span class="fa">&#62270;</span> Desktop<a class="anchor-link" href="#3.-Laptop-&#62270;-Desktop">&#182;</a></h2><p>To better understand the magic, of the relay, first ssh into the vps:</p>
+
+<pre><code>laptop-user@laptop$    ssh vps-user@vps-ip</code></pre>
+<p>Remember we forwarded port 22 of the desktop to port 2222 on the vps? Well, now - when <em>inside</em> the VPS - we can ssh via port 2222 into the desktop. Magic!</p>
+
+<pre><code>vps-user@vps$    ssh -p 2222 desktop-user@localhost</code></pre>
+<p>We made connection to the desktop!</p>
+<p>Of course, having this two-step process is a bit cumbersome. It would be great if there is a one-step connection. Guess what - there is. Connecting through the vps from the laptop to the desktop can be done via a single command:</p>
+
+<pre><code>laptop-user@laptop$    ssh -t vps-user@vps-ip ssh -p 2222 desktop-user@localhost</code></pre>
+<p>The <code>-t</code> flag basically executes the second ssh command automatically whenever the first ssh connection is made.</p>
+<p>Unfortunately, using the above command has some downsides. For one, copying files from the laptop to the desktop and vice versa (either via <code>scp</code> or via <code>rsync</code>) remains impossible.</p>
+<p>To solve this problem, a different approach can be followed by editing the SSH config on the laptop:</p>
+
+<pre><code>file: ~/.ssh/config
+
+    Host desktop
+    User desktop-user
+    ProxyCommand /usr/bin/ssh vps-user@vps -W localhost:2222</code></pre>
+<p>And here it is: connecting to the desktop from the laptop is now as simple as</p>
+
+<pre><code>laptop-user@laptop$    ssh desktop</code></pre>
+<p>Moreover, copying files and folders can be done with <code>scp</code> or <code>rsync</code>. For example:</p>
+
+<pre><code>laptop-user@laptop$    scp file.txt desktop:~/Documents/
+laptop-user@laptop$    rsync -av ~/Downloads/ desktop:~/Downloads/</code></pre>
+<p>That's it!</p>
+<p>PS: If a connection from the desktop to the laptop is needed, just do the following find and replace</p>
+
+<pre><code>    laptop, desktop =&gt; desktop, laptop
+    2222 =&gt; 3333</code></pre>
+<p>on this post and read it again from the start 😉</p>
+
+</div>
+</div>
+</div>
+ 
+
+
+
+<script data-isso="//isso.flaport.net/" src="//isso.flaport.net/js/embed.min.js"></script>
+<section id="isso-thread"></section>
+
+
+          </div>
+        </div>
+      </div>
+
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+          <h1 class="logo"><a href="/">Flaport.net</a></h1>
+
+          <h3>Blog</h3>
+          <ul>
+            <li class="toctree-l1">
+              <a class="reference internal" href="/">Home</a>
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/configuring-neomutt-for-email.html">Next&nbsp;Post</a>
+            </li>
+            
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/yolo-part-1.html">Previous&nbsp;Post</a>
+            </li>
+            
+            <h3 style="padding-top: 1em;">Tags</h3>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/machine-learning.html">machine-learning</a> (3)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/python.html">python</a> (3)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/linux.html">linux</a> (2)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/reinforcement-learning.html">reinforcement-learning</a> (2)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/yolo.html">yolo</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/tui.html">tui</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/vps.html">vps</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/productivity.html">productivity</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/computer-vision.html">computer-vision</a> (1)
+            </li>
+            
+            <h3 style="padding-top: 1em;">Projects</h3>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://photontorch.com"
+                >Photontorch</a
+              >
+            </li>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://github.com/flaport/fdtd"
+                >Python&nbsp;3D&nbsp;FDTD</a
+              >
+            </li>
+            <h3 style="padding-top: 1em;">External links</h3>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://github.com/flaport"
+                >GitHub&nbsp;<span class="fa">&nbsp;</span></a
+              >
+            </li>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://twitter.com/florislaporte"
+                >Twitter&nbsp;<span class="fa">&nbsp;</span></a
+              >
+            </li>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://linkedin.com/in/florislaporte"
+                >Linked&nbsp;<span class="fa">&nbsp;</span></a
+              >
+            </li>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://www.photonics.intec.ugent.be/contact/people.asp?ID=424"
+                >Academic&nbsp;Profile</a
+              >
+            </li>
+          </ul>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <script src="/static/js/localdates.js"></script>
+    <script src="/static/js/externallinks.js"></script>
+    <script src="/static/js/toggledarkmode.js"></script>
+  </body>
+</html>

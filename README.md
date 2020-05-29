@@ -1,2 +1,3 @@
-# flaport.github.io | flaport.net | thegate.ai
+# flaport.github.io | flaport.net
+
 my website/blog

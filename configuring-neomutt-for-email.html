@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    
+    <title>Flaport.net | Creating a local email setup with mbsync + msmtp + neomutt + notmuch.</title>
+    
+    <link rel="shortcut icon" type="image/png" href="" />
+    <link rel="stylesheet" href="/static/css/normalize.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/basic.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/fonts.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/colors.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/main.css" type="text/css" />
+    
+    
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [
+            ["$", "$"],
+            ["\\(", "\\)"],
+          ],
+        },
+      };
+    </script>
+    <script
+      id="MathJax-script"
+      async
+      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+    ></script>
+    <script
+      crossorigin="anonymous"
+      integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA="
+      src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"
+    ></script>
+  </head>
+  <body>
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="fa" align="right">
+            &nbsp;<input type="checkbox" id="darkmodetoggle" />
+          </div>
+          <div class="body" role="main">
+            
+    <h1>Creating a local email setup with mbsync + msmtp + neomutt + notmuch.</h1>
+    <p>
+    author: Flaport&nbsp;&middot;
+    published: <a class="date">2020-02-04T07:25:41Z</a>&nbsp;&middot;
+    
+    tags:
+    
+        <a href="/tags/linux.html">linux</a>&nbsp;
+    
+        <a href="/tags/productivity.html">productivity</a>&nbsp;
+    
+        <a href="/tags/tui.html">tui</a>&nbsp;
+    
+    </p>
+    <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Neomutt is a powerful terminal email client. Using neomutt as my email client has been a real pleasure, however configuring it turns out to be a bit of a pain; there are a lot of pieces that need to fall into place. Consider this post a tutorial on how I configured Neomutt to be my email <em>interface</em>, while I use <code>mbsync</code> for syncing my email, <code>msmtp</code> to send email and <code>notmuch</code> to index my email for efficient searching.</p>
+<p><strong>Note:</strong> My computer uses the <code>pacman</code> package manager, so every time you see it being used do some googling to find the equivalent package manger command that works for you.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Setting-up-pass">Setting up pass<a class="anchor-link" href="#Setting-up-pass">&#182;</a></h2><p>To be able to store your email passwords securely, you need to setup <code>gpg</code> and <code>pass</code>.</p>
+
+<pre><code>sudo pacman -S gnupg pass</code></pre>
+<p><code>gpg</code> is an executable that creates the public/private key pair, needed to encrypt your password. You can create a keypair as follows:</p>
+
+<pre><code>gpg --full-gen-key</code></pre>
+<p>Use the default options (you can set an expiry date on your key if you want) and give your contact information. The email address for the contact information is allowed to be different from the email address you'll be adding into Neomutt. Just remember which email address you picked. We'll call the email provided here <code>gpgemail</code>.</p>
+<p>After giving all the information, the key should be automatically created.</p>
+<p>Next, initialize <code>pass</code>.</p>
+
+<pre><code>pass init</code></pre>
+<p>Now, store a password entry for the email you want to add to <code>mutt</code>. Note again that this email is allowed to be different from your <code>gpgemail</code>. In the following, we will call this email your <code>muttemail</code>.</p>
+
+<pre><code>pass insert &lt;muttemail&gt;</code></pre>
+<p>It will ask you for the [imap] password corresponding to the email provided.</p>
+<p>Anytime you want to add a new email to <code>mutt</code>, don't forget to add it's password to <code>pass</code> first.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="setting-up-mbsync">setting up mbsync<a class="anchor-link" href="#setting-up-mbsync">&#182;</a></h2><p>To fetch mail from the server using imap, you need <a href="https://wiki.archlinux.org/index.php/isync">isync/mbsync</a> (isync is the name of the project, <code>mbsync</code> is the name of the executable.)</p>
+
+<pre><code>sudo pacman -S isync</code></pre>
+<p>Since <code>mbsync</code> is the name of the executable, I prefer to call it like that.</p>
+<p><code>mbsync</code> requires to be configured with a <code>~/.mbsyncrc</code>. A typical configuration looks as follows (replace the content between <code>&lt;,&gt;</code> with values provided by your email provider; note that <code>muttemail-username</code>, most likely is equal to <code>muttemail</code>.):</p>
+
+<pre><code>IMAPStore &lt;muttemail&gt;-remote
+Host &lt;imap.host.tld&gt;
+Port &lt;993&gt;
+User &lt;muttemail-username&gt;
+PassCmd "pass &lt;muttemail&gt;"
+SSLType IMAPS
+CertificateFile /etc/ssl/certs/ca-certificates.crt
+
+MaildirStore &lt;muttemail&gt;-local
+Subfolders Verbatim
+Path ~/.local/share/email/&lt;muttemail&gt;/
+INBOX ~/.local/share/email/&lt;muttemail&gt;/INBOX
+Flatten .
+
+Channel &lt;muttemail&gt;
+Master :&lt;muttemail&gt;-remote:
+Slave :&lt;muttemail&gt;-local:
+Patterns INBOX Drafts Sent Trash
+SyncState *
+Create Both
+Expunge Both
+MaxMessages 0</code></pre>
+<p><strong>Note</strong>: Google blocks most external apps by default. Make sure to enable access to <a href="https://myaccount.google.com/lesssecureapps">less secure apps</a>, or - if you have 2FA enabled - <a href="https://myaccount.google.com/apppasswords">create an app password</a>.</p>
+<p><strong>Note 2</strong>: The <code>Patterns</code> keyword allows you to choose which imap folders to sync. If you want to sync all folders, use a single <code>*</code> as argument. However, I like to be explicit here, as many email providers (looking at you Gmail 👀), have just way to many folders. Conversely, if syncing with <code>*</code>, you can exclude folders by prepending them with a <code>!</code>.</p>
+<p><strong>Note 3</strong>: See also the excellent <a href="https://wiki.archlinux.org/index.php/isync">ArchWiki post on isync</a> for more configuration options and ideas.</p>
+<p>Finally, create the folder <code>~/.local/share/email/&lt;muttemail&gt;</code>.:</p>
+
+<pre><code>mkdir -p ~/.local/share/email/&lt;muttemail&gt;</code></pre>
+<p>and start syncing your email:</p>
+
+<pre><code>mbsync &lt;muttemail&gt;</code></pre>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Setting-up-msmtp">Setting up msmtp<a class="anchor-link" href="#Setting-up-msmtp">&#182;</a></h2><p>While your email is synchronizing, we can go on setting up how to send emails. For this, we will use <code>msmtp</code> (again, replace the content between <code>&lt;,&gt;</code> with values provided by your email provider and note that <code>muttemail-username</code> most likely is equal to <code>muttemail</code>.)</p>
+
+<pre><code>sudo pacman -S msmtp</code></pre>
+<p>Next, <code>msmtp</code> is supposed to be configured at <code>~/.msmtprc</code>. Create and edit this file as follows (as usual, change the values between <code>&lt;,&gt;</code> to sensible defaults):</p>
+
+<pre><code>defaults
+auth on
+tls &lt;on/off&gt;
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile ~/.config/msmtp/msmtp.log
+
+account &lt;muttemail&gt;
+host &lt;smtp.host.tld&gt;
+port &lt;587/465/...&gt;
+tls_starttls &lt;on/off&gt;
+from &lt;muttemail&gt;
+user &lt;muttemail-username&gt; 
+passwordeval "pass &lt;muttemail&gt;"</code></pre>
+<p>Make the configuration only readable by the owner (only <code>msmtp</code> refuses to work):</p>
+
+<pre><code>chmod 600 ~/.msmtprc</code></pre>
+<p>Test the configuration by sending an email to another emailadress you own:</p>
+
+<pre><code>echo "this is some content" | msmtp -a &lt;muttemail&gt; -- &lt;recipient&gt;</code></pre>
+<p>If the email arrives, everything is configured correctly.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Setting-up-neomutt">Setting up neomutt<a class="anchor-link" href="#Setting-up-neomutt">&#182;</a></h2><p>We have email sync working with <code>mbsync</code> and we can send emails with <code>msmtp</code>. Now the only thing that needs setting up is the interface: <code>neomutt</code>, which is an improved fork of the <code>mutt</code> email client.</p>
+
+<pre><code>sudo pacman -S neomutt</code></pre>
+<p>neomutt can be configured in <code>~/.config/mutt/muttrc</code>. The basic configuration for our setup looks as follows:</p>
+
+<pre><code>## Account settings
+set from = &lt;muttemail&gt;
+set realname = "&lt;Your Name&gt;"
+
+set mbox_type = Maildir
+set folder = "~/.local/share/email/&lt;muttemail&gt;"
+
+set sendmail = "msmtp -a &lt;muttemail&gt;"
+
+# cache settings
+set header_cache = "~/.cache/mutt/&lt;muttemail&gt;/header_cache"
+set message_cachedir = "~/.cache/mutt/&lt;muttemail&gt;/message_cache"
+
+# mailbox settings
+set spoolfile = +INBOX
+set postponed = +Drafts
+set sent = +Sent
+set trash = +Trash
+
+# navigation settings
+bind index,pager g noop
+macro index,pager gi "&lt;change-folder&gt;=INBOX&lt;enter&gt;" "go to inbox"
+macro index,pager gs "&lt;change-folder&gt;=Sent&lt;enter&gt;" "go to sent"
+macro index,pager gd "&lt;change-folder&gt;=Drafts&lt;enter&gt;" "go to drafts"
+macro index,pager gt "&lt;change-folder&gt;=Trash&lt;enter&gt;" "go to trash"
+
+# synchronization settings ['s' to sync]
+macro index S "&lt;shell-escape&gt;mbsync -V &lt;muttemail&gt;&lt;enter&gt;" "sync email"</code></pre>
+<p>These are what I call the account synchronization settings. They tell mutt who you are, where your mail is stored and cached, what the names of your most important folders are (<code>INBOX</code>, <code>Drafts</code>, <code>Sent</code> and <code>Trash</code> in this case). How to navigate between these folders (<code>gi</code>, <code>gs</code>, <code>gd</code> and <code>gt</code> respectively) and finally it defines a keyboard shortcut to sync your email (<code>s</code> in this case).</p>
+<p>However, this is a bare minimum rcfile. You can configure it more. The rest of my configuration looks as follows. These settings are all independent from my account, which is why i originally called them "Other Settings".</p>
+
+<pre><code>## Other Settings
+set mail_check_stats
+set sort = 'reverse-date'
+set sidebar_visible = no
+set sidebar_width = 20
+set sidebar_short_path = yes
+set sidebar_next_new_wrap = yes
+set sidebar_format = '%B%?F? [%F]?%* %?N?%N/? %?S?%S?'
+bind index,pager \Ck sidebar-prev
+bind index,pager \Cj sidebar-next
+bind index,pager \Cl sidebar-open
+bind index,pager b sidebar-toggle-visible
+set markers = no # Disables the `+` displayed at line wraps
+set mime_forward = yes # attachments are forwarded with mail
+set wait_key = no # mutt won't ask "press key to continue"
+set fast_reply # skip to compose when replying
+set fcc_attach # save attachments with the body
+set forward_format = "Fwd: %s" # format of subject when forwarding
+set forward_quote # include message in forwards
+set reverse_name # reply as whomever it was to
+set include # include message in replies
+color header blue default ".*"
+color header brightgreen default "^(From)"
+color header brightcyan default "^(Subject)"
+color body brightred default "[\-\.+_a-zA-Z0-9]+@[\-\.a-zA-Z0-9]+" # Email addresses
+color header brightwhite default "^(To|CC|BCC)"
+color body brightblue default "(https?|ftp|file)://[\-\.,/%~_:?&amp;=\#a-zA-Z0-9;+]+" # URL</code></pre>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>These settings allow you to toggle a sidebar (by pressing <code>b</code>) and navigate the sidebar (<code>&lt;control&gt;+j/k/l</code>). In addition to that, some basic settings (see comments) and some basic coloring of emails based on regular expressions were also added.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Integration-with-Lynx-for-html-view">Integration with Lynx for html view<a class="anchor-link" href="#Integration-with-Lynx-for-html-view">&#182;</a></h2><p>Finally we can choose for a barebones html view (many emails are html only nowadays). For this we need to download <code>lynx</code></p>
+
+<pre><code>sudo pacman -S lynx</code></pre>
+<p>then make a mailcap file at <code>~/.config/mutt/mailcap</code> with contents:</p>
+
+<pre><code>text/html; &lt;your-preferred-gui-browser&gt; %s;
+text/html; lynx -assume_charset=%{charset} -display_charset=utf-8 -dump %s; nametemplate=%s.html; copiousoutput</code></pre>
+<p>And add the following lines to your <code>muttrc</code>:</p>
+
+<pre><code>auto_view text/html
+set mailcap_path = ~/.config/mutt/mailcap</code></pre>
+<p>Mutt will now choose to view the <code>text/html</code> entry of the email by default, however it will not be able to do so with the first entry in the <code>mailcap</code>, since this is a GUI browser. It will opt for the second entry instead: <code>lynx</code>. However, the latter does not display any images and styles, so it might still be valuable to be able to open them using the specified GUI browser. This can be done by tapping <code>v</code> to open the attachments of the email, selecting <code>text/html</code> and finally pressing <code>m</code> to open with the preferred <code>mailcap</code> method: your browser.</p>
+<p>If this is too much effort, you can add the following macro:</p>
+
+<pre><code>macro index,pager B "&lt;view-attachments&gt;&lt;search&gt;html&lt;enter&gt;&lt;view-mailcap&gt;&lt;exit&gt;"</code></pre>
+<p>which will open the e-mail using the default browser specified in mailcap by pressing <code>&lt;shift&gt;+b</code>.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Multiple-Accounts">Multiple Accounts<a class="anchor-link" href="#Multiple-Accounts">&#182;</a></h2><p>The above setup configured Mutt for a single account. If you have multiple email adresses, you can configure mutt to work with multiple accounts.</p>
+<p>To do this, you first have to go to the process of setting up <code>pass</code>, <code>mbsync</code>, and <code>msmtp</code> for your <code>&lt;new-muttemail&gt;</code>.</p>
+<p>Next, you need to isolate the account-specific settings (everything in the <code>## Account settings</code> section, up until <code>## Other settings</code>) from the <code>muttrc</code> into a seperate account-specific rcfile. let's call those files</p>
+
+<pre><code>~/.config/mutt/&lt;muttemail&gt;.rc
+~/.config/mutt/&lt;new-muttemail&gt;.rc</code></pre>
+<p>And replace the account section in your main <code>muttrc</code> file by:</p>
+
+<pre><code>## Account settings
+source ~/.config/mutt/&lt;muttemail&gt;.rc
+bind index,pager a noop
+macro index,pager a1 '&lt;sync-mailbox&gt;&lt;enter-command&gt;source ~/.config/mutt/&lt;muttemail&gt;.rc&lt;enter&gt;&lt;change-folder&gt;!&lt;enter&gt;;&lt;check-stats&gt;' "switch to &lt;muttemail&gt;"
+macro index,pager a2 '&lt;sync-mailbox&gt;&lt;enter-command&gt;source ~/.config/mutt/&lt;new-muttemail&gt;.rc&lt;enter&gt;&lt;change-folder&gt;!&lt;enter&gt;;&lt;check-stats&gt;' "switch to &lt;new-muttemail&gt;"</code></pre>
+<p>This makes sure that at startup the mailbox for <code>&lt;muttemail&gt;</code> is opened and that you can switch between mailboxes with <code>a1</code> for <code>&lt;muttemail&gt;</code> and <code>a2</code> for <code>&lt;new-muttemail&gt;</code>.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Mail-indexing-with-notmuch">Mail indexing with notmuch<a class="anchor-link" href="#Mail-indexing-with-notmuch">&#182;</a></h2><p>In fact, after everything we've don so far, you should have a functional email setup. You can check it out for yourself by typing <code>neomutt</code> in a terminal. Syncing your email can be done with <code>shift+S</code> (this is a custom keyboard shortcut we defined in our muttrc). Sending a new email can be done with <code>m</code>. Type <code>?</code> to see the complete list of keyboard shortcuts.</p>
+<p>However, when you have a lot of emails, one thing that's not yet completely working as we'd like is <em>searching for emails</em>. For this, we'll use the email indexer <code>notmuch</code>:</p>
+
+<pre><code>sudo pacman -S notmuch</code></pre>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>To configure <code>notmuch</code>, create and edit <code>~/.notmuch-config</code> as follows (replace <code>&lt;username&gt;</code> by your unix username):</p>
+
+<pre><code>[database]
+path=/home/&lt;username&gt;/.local/share/email
+[user]
+name=&lt;your-name&gt;
+primary_email=&lt;muttemail&gt;
+[new]
+tags=unread;inbox;
+ignore=
+[search]
+exclude_tags=deleted;spam;
+[maildir]
+synchronize_flags=true
+[crypto]
+gpg_path=gpg</code></pre>
+<p>then type</p>
+
+<pre><code>notmuch new</code></pre>
+<p>To initialize the <code>notmuch</code> database. Finally, <code>muttrc</code> needs to be updated. First of all, edit the following line:</p>
+
+<pre><code>macro index S "&lt;shell-escape&gt;mbsync -V &lt;muttemail&gt;&lt;enter&gt;" "sync email"</code></pre>
+<p>into this one:</p>
+
+<pre><code>macro index S "&lt;shell-escape&gt;mbsync -V &lt;muttemail&gt;&lt;enter&gt;&lt;shell-escape&gt;notmuch new&lt;enter&gt;" "sync email"</code></pre>
+<p>This way, the <code>notmuch</code> email index will be updated every time you sync your email through neomutt. Also, the following line should be added to have a <code>ctrl+f</code> keyboard shortcut to search for email with notmuch (which is the whole point of adding notmuch in the first place):</p>
+
+<pre><code>macro index \Cf "&lt;enter-command&gt;unset wait_key&lt;enter&gt;&lt;shell-escape&gt;read -p 'Enter a search term to find with notmuch: ' x; echo \$x &gt;~/.cache/mutt_terms&lt;enter&gt;&lt;limit&gt;~i \"\`notmuch search --output=messages \$(cat ~/.cache/mutt_terms) | head -n 600 | perl -le '@a=&lt;&gt;;s/\^id:// for@a;$,=\"|\";print@a' | perl -le '@a=&lt;&gt;; chomp@a; s/\\+/\\\\+/ for@a;print@a' \`\"&lt;enter&gt;" "show only messages matching a notmuch pattern"</code></pre>
+<p>This line was litterally copied from the <a href="https://github.com/LukeSmithxyz/mutt-wizard">mutt-wizard</a>.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="References">References<a class="anchor-link" href="#References">&#182;</a></h2><p>A lot of this post was inspired by the procedure implemented by the <a href="https://github.com/LukeSmithxyz/mutt-wizard">mutt-wizard</a>. My personal preference is to do this procedure manually, as it gives me a lot more control over the exact settings I want to use. However, if you're looking for a tool that does most (but not all) of the above configuration automatically, it's worth checking it out.</p>
+
+</div>
+</div>
+</div>
+ 
+
+
+
+<script data-isso="//isso.flaport.net/" src="//isso.flaport.net/js/embed.min.js"></script>
+<section id="isso-thread"></section>
+
+
+          </div>
+        </div>
+      </div>
+
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+          <h1 class="logo"><a href="/">Flaport.net</a></h1>
+
+          <h3>Blog</h3>
+          <ul>
+            <li class="toctree-l1">
+              <a class="reference internal" href="/">Home</a>
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/reinforcement-learning-part-2.html">Next&nbsp;Post</a>
+            </li>
+            
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/ssh-via-relay-server.html">Previous&nbsp;Post</a>
+            </li>
+            
+            <h3 style="padding-top: 1em;">Tags</h3>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/machine-learning.html">machine-learning</a> (3)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/python.html">python</a> (3)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/linux.html">linux</a> (2)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/reinforcement-learning.html">reinforcement-learning</a> (2)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/yolo.html">yolo</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/tui.html">tui</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/vps.html">vps</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/productivity.html">productivity</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a class="reference internal" href="/tags/computer-vision.html">computer-vision</a> (1)
+            </li>
+            
+            <h3 style="padding-top: 1em;">Projects</h3>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://photontorch.com"
+                >Photontorch</a
+              >
+            </li>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://github.com/flaport/fdtd"
+                >Python&nbsp;3D&nbsp;FDTD</a
+              >
+            </li>
+            <h3 style="padding-top: 1em;">External links</h3>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://github.com/flaport"
+                >GitHub&nbsp;<span class="fa">&nbsp;</span></a
+              >
+            </li>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://twitter.com/florislaporte"
+                >Twitter&nbsp;<span class="fa">&nbsp;</span></a
+              >
+            </li>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://linkedin.com/in/florislaporte"
+                >Linked&nbsp;<span class="fa">&nbsp;</span></a
+              >
+            </li>
+            <li class="toctree-l1">
+              <a class="reference internal" href="https://www.photonics.intec.ugent.be/contact/people.asp?ID=424"
+                >Academic&nbsp;Profile</a
+              >
+            </li>
+          </ul>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <script src="/static/js/localdates.js"></script>
+    <script src="/static/js/externallinks.js"></script>
+    <script src="/static/js/toggledarkmode.js"></script>
+  </body>
+</html>
