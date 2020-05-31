@@ -36,6 +36,24 @@
       integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA="
       src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"
     ></script>
+  
+<style>
+#intro {
+  border-style: dashed;
+  border-radius: 5px;
+  border-width: 1px;
+  padding-left: 10pt;
+  padding-right: 10pt;
+  padding-top: 5pt;
+  padding-bottom: 5pt;
+}
+#intro a[href*="://"]
+{
+  background: none;
+  padding-right: 0;
+}
+</style>
+
   </head>
   <body>
     <div class="document">
@@ -49,7 +67,8 @@
 
 <h1>Blog</h1>
 
-<p>I am Floris Laporte, I am
+<div id="intro">
+<p>I am Floris Laporte, I am a
 <a href="https://www.photonics.intec.ugent.be/contact/people.asp?ID=424">post-doctoral researcher at Ghent&nbsp;University</a>, Belgium. </p>
 <p>My research primarily focuses on
 <a href="https://www.photonics.intec.ugent.be/research/topics.asp?ID=112">Photonic Neuromorphic Computing and Reservoir Computing</a>,
@@ -62,221 +81,252 @@ volleybal, squash and beer.</p>
 <p>I also write some stuff down once in a while. Mostly about (desktop) linux
 and machine learning:</p>
 
+</div>
+
+
+    <h2><a href="/reinforcement-learning-part-3.html"> Play tic-tac-toe against a reinforcement agent. </a></h2>
+<!-- author: Flaport&nbsp;&middot; -->
+posted on <a href="#" class="date">2020-05-30T11:27:03Z</a>&nbsp;&middot;
+
+
+tags:
+
+
     
-        <h2><a href="/yolo-part-1.html">Building Tiny YOLO from scratch using PyTorch</a></h2>
+        <span><a href="/tags/machine-learning.html">machine-learning</a>  </span>
+    
+
+    
+        <span><a href="/tags/reinforcement-learning.html">reinforcement-learning</a>  </span>
+    
+
+    
+        <span><a href="/tags/game.html">game</a>  </span>
+    
+
+    
+        <span><a href="/tags/javascript.html">javascript</a>  </span>
+    
+
 <p>
-author: Flaport
-&middot;&nbsp;published: <a class="date">2020-05-29T12:09:34Z</a>
-
-
-&middot;&nbsp;tags:
-
-
-    
-        <a href="/tags/computer-vision.html">computer-vision</a>&nbsp;
-    
-
-    
-        <a href="/tags/machine-learning.html">machine-learning</a>&nbsp;
-    
-
-    
-        <a href="/tags/python.html">python</a>&nbsp;
-    
-
-    
-        <a href="/tags/yolo.html">yolo</a>&nbsp;
-    
-
+I finally got around on making an unbeatable tic-tac-toe game. Based of course on <a href="/reinforcement-learning-part-1.html">RL part 1</a> and <a href="/reinforcement-learning-part-2.html">RL part 2</a>. Have fun!
 </p>
+
+    <h2><a href="/yolo-part-1.html">Building Tiny YOLO from scratch using PyTorch</a></h2>
+<!-- author: Flaport&nbsp;&middot; -->
+posted on <a href="#" class="date">2020-05-29T12:09:34Z</a>&nbsp;&middot;
+
+
+tags:
+
+
+    
+        <span><a href="/tags/machine-learning.html">machine-learning</a>  </span>
+    
+
+    
+        <span><a href="/tags/python.html">python</a>  </span>
+    
+
+    
+        <span><a href="/tags/computer-vision.html">computer-vision</a>  </span>
+    
+
+    
+        <span><a href="/tags/yolo.html">yolo</a>  </span>
+    
+
 <p>In this series we’ll go over <a href="https://pjreddie.com/darknet/yolo/">YOLO</a> (<strong>Y</strong>ou <strong>O</strong>nly <strong>L</strong>ook <strong>O</strong>nce), a state-of the art object detection deep neural network. In this blog post, we’ll build the simplest YOLO network: Tiny YOLO v2. This stripped down version of YOLO will yield the easiest introduction to the neural network structure of YOLO, while still providing close to state-of-the-art performance.</p>
-    
-        <h2><a href="/ssh-via-relay-server.html">SSH via a relay server</a></h2>
-<p>
-author: Flaport
-&middot;&nbsp;published: <a class="date">2020-03-31T16:47:48Z</a>
+
+    <h2><a href="/ssh-via-relay-server.html">SSH via a relay server</a></h2>
+<!-- author: Flaport&nbsp;&middot; -->
+posted on <a href="#" class="date">2020-03-31T16:47:48Z</a>&nbsp;&middot;
 
 
-&middot;&nbsp;tags:
+tags:
 
-
-    
-        <a href="/tags/linux.html">linux</a>&nbsp;
-    
 
     
-        <a href="/tags/vps.html">vps</a>&nbsp;
+        <span><a href="/tags/linux.html">linux</a>  </span>
     
 
-</p>
+    
+        <span><a href="/tags/vps.html">vps</a>  </span>
+    
+
 <p>I often connect via SSH to my desktop computer at my desk at University. However, this computer is behind a firewall and I cannot connect to it from my laptop directly. Luckily I have my Virtual Private Server (VPS) where I - among other things - serve this blog. I use this VPS as a relay server to access my desktop from anywhere with my laptop (and vice versa).</p>
-    
-        <h2><a href="/configuring-neomutt-for-email.html">Creating a local email setup with mbsync + msmtp + neomutt + notmuch.</a></h2>
-<p>
-author: Flaport
-&middot;&nbsp;published: <a class="date">2020-02-04T07:25:41Z</a>
+
+    <h2><a href="/configuring-neomutt-for-email.html">Creating a local email setup with mbsync + msmtp + neomutt + notmuch.</a></h2>
+<!-- author: Flaport&nbsp;&middot; -->
+posted on <a href="#" class="date">2020-02-04T07:25:41Z</a>&nbsp;&middot;
 
 
-&middot;&nbsp;tags:
+tags:
 
-
-    
-        <a href="/tags/linux.html">linux</a>&nbsp;
-    
 
     
-        <a href="/tags/productivity.html">productivity</a>&nbsp;
+        <span><a href="/tags/linux.html">linux</a>  </span>
     
 
     
-        <a href="/tags/tui.html">tui</a>&nbsp;
+        <span><a href="/tags/productivity.html">productivity</a>  </span>
     
 
-</p>
+    
+        <span><a href="/tags/tui.html">tui</a>  </span>
+    
+
 <p>Neomutt is a powerful terminal email client. Using neomutt as my email client has been a real pleasure, however configuring it turns out to be a bit of a pain; there are a lot of pieces that need to fall into place. Consider this post a tutorial on how I configured Neomutt to be my email <em>interface</em>, while I use <code>mbsync</code> for syncing my email, <code>msmtp</code> to send email and <code>notmuch</code> to index my email for efficient searching.</p>
-    
-        <h2><a href="/reinforcement-learning-part-2.html">Reinforcement learning from the ground up | part 2: tic-tac-toe revisited for deep Q learning</a></h2>
-<p>
-author: Flaport
-&middot;&nbsp;published: <a class="date">2019-12-22T14:53:34Z</a>
+
+    <h2><a href="/reinforcement-learning-part-2.html">Reinforcement learning from the ground up | part 2: deep Q learning on tic-tac-toe.</a></h2>
+<!-- author: Flaport&nbsp;&middot; -->
+posted on <a href="#" class="date">2019-12-22T14:53:34Z</a>&nbsp;&middot;
+
+last modified on <a href="#" class="date">2020-05-30T11:27:03Z</a>&nbsp;&middot;
 
 
-&middot;&nbsp;tags:
+tags:
 
-
-    
-        <a href="/tags/machine-learning.html">machine-learning</a>&nbsp;
-    
 
     
-        <a href="/tags/python.html">python</a>&nbsp;
+        <span><a href="/tags/machine-learning.html">machine-learning</a>  </span>
     
 
     
-        <a href="/tags/reinforcement-learning.html">reinforcement-learning</a>&nbsp;
+        <span><a href="/tags/python.html">python</a>  </span>
     
 
-</p>
+    
+        <span><a href="/tags/reinforcement-learning.html">reinforcement-learning</a>  </span>
+    
+
 <p>Previously, we saw that reinforcement learning worked quite well on tic-tac-toe. However, there’s something unsatisfying about working with a Q-table storing all the possible states of the game. It feels like the Agent simply memorizes each state of the game and acts according to some memorized rules obtained by its huge amount of experience (remember that the Agent played 10,000,000 games during training). In this second part of the reinforcement learning series, we’ll swap out the Q table for a <em>neural network</em>.</p>
-    
-        <h2><a href="/reinforcement-learning-part-1.html">Reinforcement learning from the ground up: part 1: tic-tac-toe</a></h2>
-<p>
-author: Flaport
-&middot;&nbsp;published: <a class="date">2019-11-29T12:12:07Z</a>
+
+    <h2><a href="/reinforcement-learning-part-1.html">Reinforcement learning from the ground up | part 1: tic-tac-toe.</a></h2>
+<!-- author: Flaport&nbsp;&middot; -->
+posted on <a href="#" class="date">2019-11-29T12:12:07Z</a>&nbsp;&middot;
+
+last modified on <a href="#" class="date">2020-05-30T11:27:03Z</a>&nbsp;&middot;
 
 
-&middot;&nbsp;tags:
+tags:
 
-
-    
-        <a href="/tags/machine-learning.html">machine-learning</a>&nbsp;
-    
 
     
-        <a href="/tags/reinforcement-learning.html">reinforcement-learning</a>&nbsp;
+        <span><a href="/tags/machine-learning.html">machine-learning</a>  </span>
     
 
     
-        <a href="/tags/python.html">python</a>&nbsp;
+        <span><a href="/tags/reinforcement-learning.html">reinforcement-learning</a>  </span>
     
 
-</p>
+    
+        <span><a href="/tags/python.html">python</a>  </span>
+    
+
 <p>As a first example to reinforcement learning, we’ll make our computer learn by itself how to play tic-tac-toe. As one of the most simple 2 player games, tic-tac-toe is ideal to get started with reinforcement learning, while still being more interesting that learning to play a single player game.</p>
-    
+
 
 
           </div>
         </div>
       </div>
 
-      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+      <div class="sphinxsidebar">
         <div class="sphinxsidebarwrapper">
           <h1 class="logo"><a href="/">Flaport.net</a></h1>
 
           <h3>Blog</h3>
           <ul>
             <li class="toctree-l1">
-              <a class="reference internal" href="/">Home</a>
+              <a href="/">Home</a>
             </li>
             
             <li class="toctree-l1">
-                <a class="reference internal" href="/yolo-part-1.html">Next&nbsp;Post</a>
+                <a href="/reinforcement-learning-part-3.html">Next&nbsp;Post</a>
             </li>
             
             
             <h3 style="padding-top: 1em;">Tags</h3>
             
             <li class="toctree-l1">
-                <a class="reference internal" href="/tags/machine-learning.html">machine-learning</a> (3)
+                <a href="/tags/machine-learning.html">machine-learning</a> (4)
             </li>
             
             <li class="toctree-l1">
-                <a class="reference internal" href="/tags/python.html">python</a> (3)
+                <a href="/tags/python.html">python</a> (3)
             </li>
             
             <li class="toctree-l1">
-                <a class="reference internal" href="/tags/linux.html">linux</a> (2)
+                <a href="/tags/reinforcement-learning.html">reinforcement-learning</a> (3)
             </li>
             
             <li class="toctree-l1">
-                <a class="reference internal" href="/tags/reinforcement-learning.html">reinforcement-learning</a> (2)
+                <a href="/tags/linux.html">linux</a> (2)
             </li>
             
             <li class="toctree-l1">
-                <a class="reference internal" href="/tags/yolo.html">yolo</a> (1)
+                <a href="/tags/computer-vision.html">computer-vision</a> (1)
             </li>
             
             <li class="toctree-l1">
-                <a class="reference internal" href="/tags/tui.html">tui</a> (1)
+                <a href="/tags/game.html">game</a> (1)
             </li>
             
             <li class="toctree-l1">
-                <a class="reference internal" href="/tags/vps.html">vps</a> (1)
+                <a href="/tags/javascript.html">javascript</a> (1)
             </li>
             
             <li class="toctree-l1">
-                <a class="reference internal" href="/tags/productivity.html">productivity</a> (1)
+                <a href="/tags/productivity.html">productivity</a> (1)
             </li>
             
             <li class="toctree-l1">
-                <a class="reference internal" href="/tags/computer-vision.html">computer-vision</a> (1)
+                <a href="/tags/tui.html">tui</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a href="/tags/vps.html">vps</a> (1)
+            </li>
+            
+            <li class="toctree-l1">
+                <a href="/tags/yolo.html">yolo</a> (1)
             </li>
             
             <h3 style="padding-top: 1em;">Projects</h3>
             <li class="toctree-l1">
-              <a class="reference internal" href="https://photontorch.com"
+              <a href="https://photontorch.com"
                 >Photontorch</a
               >
             </li>
             <li class="toctree-l1">
-              <a class="reference internal" href="https://github.com/flaport/fdtd"
+              <a href="https://github.com/flaport/fdtd"
                 >Python&nbsp;3D&nbsp;FDTD</a
               >
             </li>
             <h3 style="padding-top: 1em;">External links</h3>
             <li class="toctree-l1">
-              <a class="reference internal" href="https://github.com/flaport"
+              <a href="https://github.com/flaport"
                 >GitHub&nbsp;<span class="fa">&nbsp;</span></a
               >
             </li>
             <li class="toctree-l1">
-              <a class="reference internal" href="https://twitter.com/florislaporte"
+              <a href="https://twitter.com/florislaporte"
                 >Twitter&nbsp;<span class="fa">&nbsp;</span></a
               >
             </li>
             <li class="toctree-l1">
-              <a class="reference internal" href="https://linkedin.com/in/florislaporte"
+              <a href="https://linkedin.com/in/florislaporte"
                 >Linked&nbsp;<span class="fa">&nbsp;</span></a
               >
             </li>
             <li class="toctree-l1">
-              <a class="reference internal" href="https://www.photonics.intec.ugent.be/contact/people.asp?ID=424"
+              <a href="https://www.photonics.intec.ugent.be/contact/people.asp?ID=424"
                 >Academic&nbsp;Profile</a
               >
             </li>
           </ul>
       </div>
-      <div class="clearer"></div>
     </div>
     <script src="/static/js/localdates.js"></script>
     <script src="/static/js/externallinks.js"></script>
