@@ -9,11 +9,9 @@
     
     <link rel="shortcut icon" type="image/png" href="" />
     <link rel="stylesheet" href="/static/css/normalize.css" type="text/css" />
-    <link rel="stylesheet" href="/static/css/basic.css" type="text/css" />
-    <link rel="stylesheet" href="/static/css/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="/static/css/fonts.css" type="text/css" />
-    <link rel="stylesheet" href="/static/css/colors.css" type="text/css" />
     <link rel="stylesheet" href="/static/css/main.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/colors.css" type="text/css" />
     
     
     <script>
@@ -40,18 +38,19 @@
   </head>
   <body>
     <div class="document">
-      <div class="documentwrapper">
-        <div class="bodywrapper">
-          <div class="body" role="main">
-          <div class="fa" align="right">
-            &nbsp;<input type="checkbox" id="darkmodetoggle" />
+      <div class="contentwrapper">
+          <div class="fa noprint" align="right">
+            &nbsp;<input type="checkbox" class="noprint" id="darkmodetoggle" />
           </div>
+        <div class="content">
             
     <h1>Tag: Vps</h1>
     
         <h2><a href="/ssh-via-relay-server.html">SSH via a relay server</a></h2>
 <!-- author: Flaport&nbsp;&middot; -->
 posted on <a href="#" class="date">2020-03-31T16:47:48Z</a>&nbsp;&middot;
+
+last modified on <a href="#" class="date">2020-05-31T23:12:02Z</a>&nbsp;&middot;
 
 
 tags:
@@ -68,12 +67,11 @@ tags:
 <p>I often connect via SSH to my desktop computer at my desk at University. However, this computer is behind a firewall and I cannot connect to it from my laptop directly. Luckily I have my Virtual Private Server (VPS) where I - among other things - serve this blog. I use this VPS as a relay server to access my desktop from anywhere with my laptop (and vice versa).</p>
     
 
-          </div>
         </div>
       </div>
 
-      <div class="sphinxsidebar">
-        <div class="sphinxsidebarwrapper">
+      <div class="sidebar">
+        <div class="sidebarwrapper">
           <h1 class="logo"><a href="/">Flaport.net</a></h1>
 
           <h3>Blog</h3>
@@ -83,6 +81,10 @@ tags:
             </li>
             
             
+            
+            <li class="toctree-l1">
+                <a href="/index.xml" target="_blank">RSS&nbsp;<span class="fa"></span></a>
+            </li>
             <h3 style="padding-top: 1em;">Tags</h3>
             
             <li class="toctree-l1">
@@ -161,6 +163,9 @@ tags:
                 >Academic&nbsp;Profile</a
               >
             </li>
+            <div style="padding-top: 2em;">
+                <span class="fa"></span> Floris Laporte 2020
+            </div>
           </ul>
       </div>
     </div>

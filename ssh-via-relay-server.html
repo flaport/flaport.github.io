@@ -9,11 +9,9 @@
     
     <link rel="shortcut icon" type="image/png" href="" />
     <link rel="stylesheet" href="/static/css/normalize.css" type="text/css" />
-    <link rel="stylesheet" href="/static/css/basic.css" type="text/css" />
-    <link rel="stylesheet" href="/static/css/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="/static/css/fonts.css" type="text/css" />
-    <link rel="stylesheet" href="/static/css/colors.css" type="text/css" />
     <link rel="stylesheet" href="/static/css/main.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/colors.css" type="text/css" />
     
     
     <script>
@@ -40,16 +38,17 @@
   </head>
   <body>
     <div class="document">
-      <div class="documentwrapper">
-        <div class="bodywrapper">
-          <div class="body" role="main">
-          <div class="fa" align="right">
-            &nbsp;<input type="checkbox" id="darkmodetoggle" />
+      <div class="contentwrapper">
+          <div class="fa noprint" align="right">
+            &nbsp;<input type="checkbox" class="noprint" id="darkmodetoggle" />
           </div>
+        <div class="content">
             
     <h1>SSH via a relay server</h1>
 <!-- author: Flaport&nbsp;&middot; -->
 posted on <a href="#" class="date">2020-03-31T16:47:48Z</a>&nbsp;&middot;
+
+last modified on <a href="#" class="date">2020-05-31T23:12:02Z</a>&nbsp;&middot;
 
 
 tags:
@@ -84,7 +83,7 @@ tags:
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="1.-Desktop-&#62270;-VPS">1. Desktop <span class="fa">&#62270;</span> VPS<a class="anchor-link" href="#1.-Desktop-&#62270;-VPS">&#182;</a></h2><p>First, the desktop needs to allow incoming ssh connections (you might need to install OpenSSH). Usually this is done by enabling and starting a <code>systemd</code> service:</p>
+<h2 id="1.-Desktop-&#61816;-VPS">1. Desktop <span class="fa">&#61816;</span> VPS<a class="anchor-link" href="#1.-Desktop-&#61816;-VPS">&#182;</a></h2><p>First, the desktop needs to allow incoming ssh connections (you might need to install OpenSSH). Usually this is done by enabling and starting a <code>systemd</code> service:</p>
 
 <pre><code>desktop-user@desktop$    sudo systemctl enable sshd
 desktop-user@desktop$    sudo systemctl start sshd</code></pre>
@@ -130,7 +129,7 @@ desktop-user@desktop$    sudo systemctl start sshtunnel</code></pre>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="2.-Laptop-&#62270;-VPS">2. Laptop <span class="fa">&#62270;</span> VPS<a class="anchor-link" href="#2.-Laptop-&#62270;-VPS">&#182;</a></h2><p>Connecting the laptop to the VPS works the same as connecting the desktop to the VPS. The discussion from above can largely be repeated (change port 2222 to another port number though). However, when you're not interested in enabling connections from the desktop to the laptop, large parts of the above section can be skipped for the laptop. This is what remains:</p>
+<h2 id="2.-Laptop-&#61816;-VPS">2. Laptop <span class="fa">&#61816;</span> VPS<a class="anchor-link" href="#2.-Laptop-&#61816;-VPS">&#182;</a></h2><p>Connecting the laptop to the VPS works the same as connecting the desktop to the VPS. The discussion from above can largely be repeated (change port 2222 to another port number though). However, when you're not interested in enabling connections from the desktop to the laptop, large parts of the above section can be skipped for the laptop. This is what remains:</p>
 
 <pre><code>laptop-user@laptop$    ssh-keygen            # again, don't set a password and just use id_rsa as id
 laptop-user@laptop$    ssh-copy-id vps-id    # copy the id_rsa ssh-id to the vps
@@ -143,7 +142,7 @@ laptop-user@laptop$    ssh vps-id            # check if you can login into the v
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="3.-Laptop-&#62270;-Desktop">3. Laptop <span class="fa">&#62270;</span> Desktop<a class="anchor-link" href="#3.-Laptop-&#62270;-Desktop">&#182;</a></h2><p>To better understand the magic, of the relay, first ssh into the vps:</p>
+<h2 id="3.-Laptop-&#61816;-Desktop">3. Laptop <span class="fa">&#61816;</span> Desktop<a class="anchor-link" href="#3.-Laptop-&#61816;-Desktop">&#182;</a></h2><p>To better understand the magic, of the relay, first ssh into the vps:</p>
 
 <pre><code>laptop-user@laptop$    ssh vps-user@vps-ip</code></pre>
 <p>Remember we forwarded port 22 of the desktop to port 2222 on the vps? Well, now - when <em>inside</em> the VPS - we can ssh via port 2222 into the desktop. Magic!</p>
@@ -184,15 +183,20 @@ laptop-user@laptop$    rsync -av ~/Downloads/ desktop:~/Downloads/</code></pre>
 
 
 <script data-isso="//isso.flaport.net/" src="//isso.flaport.net/js/embed.min.js"></script>
+<style>
+#isso-thread > h4 {
+    color: var(--color15);
+    font-weight: bold;
+}
+</style>
 <section id="isso-thread"></section>
 
 
-          </div>
         </div>
       </div>
 
-      <div class="sphinxsidebar">
-        <div class="sphinxsidebarwrapper">
+      <div class="sidebar">
+        <div class="sidebarwrapper">
           <h1 class="logo"><a href="/">Flaport.net</a></h1>
 
           <h3>Blog</h3>
@@ -201,15 +205,19 @@ laptop-user@laptop$    rsync -av ~/Downloads/ desktop:~/Downloads/</code></pre>
               <a href="/">Home</a>
             </li>
             
+            
             <li class="toctree-l1">
-                <a href="/configuring-neomutt-for-email.html">Next&nbsp;Post</a>
+                <a href="/yolo-part-1.html">Next&nbsp;(newer)</a>
             </li>
             
             
             <li class="toctree-l1">
-                <a href="/yolo-part-1.html">Previous&nbsp;Post</a>
+                <a href="/configuring-neomutt-for-email.html">Previous&nbsp;(older)</a>
             </li>
             
+            <li class="toctree-l1">
+                <a href="/index.xml" target="_blank">RSS&nbsp;<span class="fa"></span></a>
+            </li>
             <h3 style="padding-top: 1em;">Tags</h3>
             
             <li class="toctree-l1">
@@ -288,6 +296,9 @@ laptop-user@laptop$    rsync -av ~/Downloads/ desktop:~/Downloads/</code></pre>
                 >Academic&nbsp;Profile</a
               >
             </li>
+            <div style="padding-top: 2em;">
+                <span class="fa"></span> Floris Laporte 2020
+            </div>
           </ul>
       </div>
     </div>
