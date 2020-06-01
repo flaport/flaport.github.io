@@ -6,10 +6,10 @@
 <generator>Flaport.net</generator>
 <language>en-US</language>
 <copyright>Copyright (c) 2020, all rights reserved.</copyright>
-<lastBuildDate>2020-06-01T10:19:25Z</lastBuildDate>
+<lastBuildDate>2020-06-01T15:10:12Z</lastBuildDate>
 
 <item>
-<title> Play tic-tac-toe against a reinforcement agent. </title>
+<title> Play tic-tac-toe against a reinforcement agent </title>
 <link>https://blog.flaport.net/reinforcement-learning-part-3.html</link>
 <pubDate>2020-05-30T11:27:03Z</pubDate>
 <guid>https://blog.flaport.net/reinforcement-learning-part-3.html</guid>
@@ -23,7 +23,7 @@ I finally got around on making an unbeatable tic-tac-toe game. Based of course o
 <item>
 <title>Building Tiny YOLO from scratch using PyTorch</title>
 <link>https://blog.flaport.net/yolo-part-1.html</link>
-<pubDate>2020-05-29T12:09:34Z</pubDate>
+<pubDate>2020-04-23T12:09:34Z</pubDate>
 <guid>https://blog.flaport.net/yolo-part-1.html</guid>
 <description>
 In this series we’ll go over YOLO (You Only Look Once), a state-of the art object detection deep neural network. In this blog post, we’ll build the simplest YOLO network: Tiny YOLO v2. This stripped down version of YOLO will yield the easiest introduction to the neural network structure of YOLO, while still providing close to state-of-the-art performance.
