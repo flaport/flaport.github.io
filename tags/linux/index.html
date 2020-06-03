@@ -1,11 +1,14 @@
 <!DOCTYPE html>
+
+
+
 <html lang="en">
   <head>
     <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     
-    <title>Flaport.net | Tui</title>
+    <title>Flaport.net | Linux</title>
     
     <link rel="shortcut icon" type="image/png" href="" />
     <link rel="stylesheet" href="/static/css/normalize.css" type="text/css" />
@@ -34,32 +37,68 @@
   <body>
     <div class="document">
       <div class="contentwrapper">
-          <div class="fa noprint" align="right">
-            &nbsp;<input type="checkbox" class="noprint" id="darkmodetoggle" />
+
+          <div class="noprint" align="right">
+          <span class="fa tooltip hideborder" style="cursor: default">
+                &nbsp;
+                <span class="tooltiptext">toggle dark mode</span>
+          </span>
+          <span class="fa tooltip hideborder" style="cursor: default">
+                <input type="checkbox" class="noprint" id="darkmodetoggle"/>
+                <span class="tooltiptext">toggle dark mode</span>
+          </span>
           </div>
+
+
         <div class="content">
             
-    <h1>Tag: Tui</h1>
+    <h1>Tag: Linux</h1>
     
-        <h2><a href="/configuring-neomutt-for-email.html">Creating a local email setup with mbsync + msmtp + neomutt + notmuch.</a></h2>
+        
+    <h2><a href="/tags/linux/ssh-via-relay-server.html">SSH via a relay server</a></h2>
+
 <!-- author: Flaport&nbsp;&middot; -->
-posted on <a href="#" class="date">2020-02-04T07:25:41Z</a>&nbsp;&middot;
+posted on <a href="#" class="date">2020-03-31T16:47:48Z</a>
+
+&middot;&nbsp;last modified on <a href="#" class="date">2020-05-31T23:12:02Z</a>
 
 
+<div style="padding-top: 3pt">
 tags:
 
-
-    
-        <span><a href="/tags/linux.html">linux</a>  </span>
     
 
-    
-        <span><a href="/tags/productivity.html">productivity</a>  </span>
-    
+<span class="currenttag tooltip">linux<sup>&nbsp;(2)</sup></span>
+
+
 
     
-        <span>tui  </span>
+
+<a class="tag tooltip" href="/tags/vps/">vps<sup>&nbsp;(1)</sup></a>
+
+
+
+</div>
+
+<p>I often connect via SSH to my desktop computer at my desk at University. However, this computer is behind a firewall and I cannot connect to it from my laptop directly. Luckily I have my Virtual Private Server (VPS) where I - among other things - serve this blog. I use this VPS as a relay server to access my desktop from anywhere with my laptop (and vice versa).</p>
     
+        
+    <h2><a href="/tags/linux/configuring-neomutt-for-email.html">Creating a local email setup with mbsync + msmtp + neomutt + notmuch.</a></h2>
+
+<!-- author: Flaport&nbsp;&middot; -->
+posted on <a href="#" class="date">2020-02-04T07:25:41Z</a>
+
+
+<div style="padding-top: 3pt">
+tags:
+
+    
+
+<span class="currenttag tooltip">linux<sup>&nbsp;(2)</sup></span>
+
+
+
+</div>
 
 <p>Neomutt is a powerful terminal email client. Using neomutt as my email client has been a real pleasure, however configuring it turns out to be a bit of a pain; there are a lot of pieces that need to fall into place. Consider this post a tutorial on how I configured Neomutt to be my email <em>interface</em>, while I use <code>mbsync</code> for syncing my email, <code>msmtp</code> to send email and <code>notmuch</code> to index my email for efficient searching.</p>
     
@@ -70,76 +109,101 @@ tags:
       <div class="sidebar">
         <div class="sidebarwrapper">
           <h1 class="logo"><a href="/">Flaport.net</a></h1>
-
-          <h3>Blog</h3>
           <ul>
             <li class="toctree-l1">
               <a href="/">Home</a>
             </li>
             
+            <li class="toctree-l1">
+                Tag: <a href="/tags/linux/">linux</a>
+                
+                
+                
+                <a class="fa tooltip hideborder" href="/index.html">
+                <span class="tooltiptext">exit [linux] tag view</span>
+                </a>
+            </li>
             
             
             <li class="toctree-l1">
-                <a href="/index.xml" target="_blank">RSS&nbsp;<span class="fa"></span></a>
+                
+                <a href="/tags/linux/ssh-via-relay-server.html">Newest [linux] Post</a>
+                
             </li>
+            
+            
+            
             <h3 style="padding-top: 1em;">Tags</h3>
             
-            <li class="toctree-l1">
-                <a href="/tags/machine-learning.html">machine-learning</a> (4)
-            </li>
+                
+
+<a class="tag tooltip" href="/tags/ml/">ml<sup>&nbsp;(4)</sup><span class="tooltiptext">machine learning</span></a>
+
+
             
-            <li class="toctree-l1">
-                <a href="/tags/python.html">python</a> (3)
-            </li>
+                
+
+<a class="tag tooltip" href="/tags/python/">python<sup>&nbsp;(3)</sup></a>
+
+
             
-            <li class="toctree-l1">
-                <a href="/tags/reinforcement-learning.html">reinforcement-learning</a> (3)
-            </li>
+                
+
+<a class="tag tooltip" href="/tags/rl/">rl<sup>&nbsp;(3)</sup><span class="tooltiptext">reinforcement learning</span></a>
+
+
             
-            <li class="toctree-l1">
-                <a href="/tags/linux.html">linux</a> (2)
-            </li>
+                
+
+<span class="currenttag tooltip">linux<sup>&nbsp;(2)</sup></span>
+
+
             
-            <li class="toctree-l1">
-                <a href="/tags/computer-vision.html">computer-vision</a> (1)
-            </li>
+                
+
+<a class="tag tooltip" href="/tags/cv/">cv<sup>&nbsp;(1)</sup><span class="tooltiptext">computer vision</span></a>
+
+
             
-            <li class="toctree-l1">
-                <a href="/tags/game.html">game</a> (1)
-            </li>
+                
+
+<a class="tag tooltip" href="/tags/game/">game<sup>&nbsp;(1)</sup></a>
+
+
             
-            <li class="toctree-l1">
-                <a href="/tags/javascript.html">javascript</a> (1)
-            </li>
+                
+
+<a class="tag tooltip" href="/tags/javascript/">javascript<sup>&nbsp;(1)</sup></a>
+
+
             
-            <li class="toctree-l1">
-                <a href="/tags/productivity.html">productivity</a> (1)
-            </li>
+                
+
+<a class="tag tooltip" href="/tags/vps/">vps<sup>&nbsp;(1)</sup></a>
+
+
             
-            <li class="toctree-l1">
-                <a href="/tags/tui.html">tui</a> (1)
-            </li>
-            
-            <li class="toctree-l1">
-                <a href="/tags/vps.html">vps</a> (1)
-            </li>
-            
-            <li class="toctree-l1">
-                <a href="/tags/yolo.html">yolo</a> (1)
-            </li>
+                
+
+<a class="tag tooltip" href="/tags/yolo/">yolo<sup>&nbsp;(1)</sup></a>
+
+
             
             <h3 style="padding-top: 1em;">Projects</h3>
             <li class="toctree-l1">
               <a href="https://photontorch.com"
-                >Photontorch</a
+                >Photontorch&nbsp;</a
               >
             </li>
             <li class="toctree-l1">
               <a href="https://github.com/flaport/fdtd"
-                >Python&nbsp;3D&nbsp;FDTD</a
+                >Python&nbsp;3D&nbsp;FDTD&nbsp;</a
               >
             </li>
             <h3 style="padding-top: 1em;">External links</h3>
+            <li class="toctree-l1">
+                <a href="/index.xml" target="_blank">RSS&nbsp;<span class="fa">&nbsp;</span></a>
+            </li>
             <li class="toctree-l1">
               <a href="https://github.com/flaport"
                 >GitHub&nbsp;<span class="fa">&nbsp;</span></a
@@ -157,7 +221,7 @@ tags:
             </li>
             <li class="toctree-l1">
               <a href="https://www.photonics.intec.ugent.be/contact/people.asp?ID=424"
-                >Academic&nbsp;Profile</a
+                 >Academic&nbsp;Profile&nbsp;<span class="fa"></span>&nbsp;</a
               >
             </li>
             <div style="padding-top: 2em;">
