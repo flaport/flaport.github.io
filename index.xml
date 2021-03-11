@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0">
 <channel>
 <title>Flaport.net</title>
@@ -5,8 +6,58 @@
 <description>Flaport.net posts</description>
 <generator>Flaport.net</generator>
 <language>en-US</language>
-<copyright>Copyright (c) 2020, all rights reserved.</copyright>
-<lastBuildDate>2020-06-03T15:14:23Z</lastBuildDate>
+<copyright>Copyright (c) 2021, all rights reserved.</copyright>
+<lastBuildDate>2021-03-11T12:10:00Z</lastBuildDate>
+
+<item>
+<title>A Fully connected neural network in JAX</title>
+<link>https://blog.flaport.net/fully-connected-neural-network-in-jax.html</link>
+<pubDate>2020-12-25T14:48:19Z</pubDate>
+<guid>https://blog.flaport.net/fully-connected-neural-network-in-jax.html</guid>
+<description>
+JAX is the hot new ML-tool on the block. I’m currently trying to get acquinted with it. The first thing I usually do to get to know a tool like this is to make a simple neural network to solve the MNIST digit recognition task. So here we go…
+</description>
+</item>
+
+<item>
+<title>My notes on GPG and PGP</title>
+<link>https://blog.flaport.net/notes-on-gpg.html</link>
+<pubDate>2020-11-30T15:11:36Z</pubDate>
+<guid>https://blog.flaport.net/notes-on-gpg.html</guid>
+<description>
+GPG stands for the ‘GNU Privacy Guard’. It’s the standard way to manage your PGP keys on Linux. PGP, in turn, stands for ‘Pretty Good Privacy’. With PGP you typically create a public/private key pair which are respectively used to encrypt and decrypt messages. PGP keys are mostly used to send sensitive information over the internet or to prove your identity online.
+</description>
+</item>
+
+<item>
+<title>Creating a Pytorch solver for sparse linear systems</title>
+<link>https://blog.flaport.net/solving-sparse-linear-systems-in-pytorch.html</link>
+<pubDate>2020-10-17T11:04:18Z</pubDate>
+<guid>https://blog.flaport.net/solving-sparse-linear-systems-in-pytorch.html</guid>
+<description>
+Not so long ago, I implemented a wrapper library in PyTorch to solve sparse linear systems on the CPU using the SuiteSparse routines under the hood. My goal is to eventually integrate this sparse solver into my photonic circuit simulator, Photontorch. However, for now, I thought it would be instructive to go over the steps I took to implement both the forward pass and the backward pass of such a custom PyTorch function.
+</description>
+</item>
+
+<item>
+<title>Towards a loss function for YOLO</title>
+<link>https://blog.flaport.net/yolo-part-2.html</link>
+<pubDate>2020-09-01T09:57:11Z</pubDate>
+<guid>https://blog.flaport.net/yolo-part-2.html</guid>
+<description>
+Writing the second part of the YOLO series took a lot longer than I care to admit… but, it’s finally here! In this part we’ll go over the definition of a loss function to train the YOLO architecture.
+</description>
+</item>
+
+<item>
+<title>Wrapping your head around the most used bash operators</title>
+<link>https://blog.flaport.net/bash-operators.html</link>
+<pubDate>2020-07-26T15:06:55Z</pubDate>
+<guid>https://blog.flaport.net/bash-operators.html</guid>
+<description>
+This is mostly geared towards helping bash-beginners. Having a sound understanding of what each bash operator does might help you becoming a bash-wizard ;)
+</description>
+</item>
 
 <item>
 <title> Play tic-tac-toe against a reinforcement agent </title>
@@ -14,9 +65,7 @@
 <pubDate>2020-05-30T11:27:03Z</pubDate>
 <guid>https://blog.flaport.net/reinforcement-learning-part-3.html</guid>
 <description>
-
-I finally got around on making an unbeatable tic-tac-toe game. Based of course on RL part 1 and RL part 2. Have fun!
-
+I finally made an unbeatable tic-tac-toe game in javascript using the qtable obtained in in the first reinforcement learning post. Have Fun going for the tie!
 </description>
 </item>
 

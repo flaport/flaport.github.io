@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+      xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+            http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+
+
+<url>
+  <loc>https://blog.flaport.net/index.html</loc>
+  <lastmod>2021-01-23T16:42:08Z</lastmod>
+  <priority>1.0</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/fully-connected-neural-network-in-jax.html</loc>
+  <lastmod>2020-12-25T14:48:19Z</lastmod>
+  <priority>0.85</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/notes-on-gpg.html</loc>
+  <lastmod>2021-01-23T16:42:08Z</lastmod>
+  <priority>0.85</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/solving-sparse-linear-systems-in-pytorch.html</loc>
+  <lastmod>2020-10-17T11:29:56Z</lastmod>
+  <priority>0.85</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/yolo-part-2.html</loc>
+  <lastmod>2020-09-01T10:07:31Z</lastmod>
+  <priority>0.85</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/bash-operators.html</loc>
+  <lastmod>2020-07-26T15:06:55Z</lastmod>
+  <priority>0.85</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/reinforcement-learning-part-3.html</loc>
+  <lastmod>2020-06-10T11:53:21Z</lastmod>
+  <priority>0.85</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/yolo-part-1.html</loc>
+  <lastmod>2020-09-01T09:57:11Z</lastmod>
+  <priority>0.85</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/ssh-via-relay-server.html</loc>
+  <lastmod>2020-05-31T23:12:02Z</lastmod>
+  <priority>0.85</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/configuring-neomutt-for-email.html</loc>
+  <lastmod>2020-12-21T09:25:24Z</lastmod>
+  <priority>0.85</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/reinforcement-learning-part-2.html</loc>
+  <lastmod>2020-06-01T11:36:56Z</lastmod>
+  <priority>0.85</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/reinforcement-learning-part-1.html</loc>
+  <lastmod>2020-06-01T11:36:56Z</lastmod>
+  <priority>0.85</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/tags/ml/</loc>
+  <lastmod>2020-12-25T14:48:19Z</lastmod>
+  <priority>0.6</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/tags/python/</loc>
+  <lastmod>2020-12-25T14:48:19Z</lastmod>
+  <priority>0.6</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/tags/cv/</loc>
+  <lastmod>2020-12-25T14:48:19Z</lastmod>
+  <priority>0.6</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/tags/rl/</loc>
+  <lastmod>2020-06-10T11:53:21Z</lastmod>
+  <priority>0.6</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/tags/linux/</loc>
+  <lastmod>2020-12-21T09:25:24Z</lastmod>
+  <priority>0.6</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/tags/yolo/</loc>
+  <lastmod>2020-09-01T10:07:31Z</lastmod>
+  <priority>0.6</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/tags/c++/</loc>
+  <lastmod>2020-10-17T11:29:56Z</lastmod>
+  <priority>0.6</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/tags/game/</loc>
+  <lastmod>2020-06-10T11:53:21Z</lastmod>
+  <priority>0.6</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/tags/javascript/</loc>
+  <lastmod>2020-06-10T11:53:21Z</lastmod>
+  <priority>0.6</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/tags/jax/</loc>
+  <lastmod>2020-12-25T14:48:19Z</lastmod>
+  <priority>0.6</priority>
+</url>
+
+<url>
+  <loc>https://blog.flaport.net/tags/vps/</loc>
+  <lastmod>2020-05-31T23:12:02Z</lastmod>
+  <priority>0.6</priority>
+</url>
+
+
+</urlset>

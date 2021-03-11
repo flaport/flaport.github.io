@@ -1,7 +1,5 @@
 <!DOCTYPE html>
-
-
-
+  
 <html lang="en">
   <head>
     <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
@@ -10,13 +8,15 @@
     
     <title>Flaport.net |  Play tic-tac-toe against a reinforcement agent </title>
     
-    <link rel="shortcut icon" type="image/png" href="" />
+    
+    <meta name="description" content="I finally made an unbeatable tic-tac-toe game in javascript using the qtable obtained in in the first reinforcement learning post. Have Fun going for the tie!">
+    
+    <link rel="shortcut icon" type="image/svg" href="/static/img/icon.svg" />
     <link rel="stylesheet" href="/static/css/normalize.css" type="text/css" />
     <link rel="stylesheet" href="/static/css/fonts.css" type="text/css" />
     <link rel="stylesheet" href="/static/css/main.css" type="text/css" />
     <link rel="stylesheet" href="/static/css/colors.css" type="text/css" />
-    
-    
+     
     <script>
       window.MathJax = {
         tex: {
@@ -27,44 +27,62 @@
         },
       };
     </script>
-    <script
-      id="MathJax-script"
-      async
-      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
-    ></script>
-   
+     
+    <!-- Matomo -->
+    <script type="text/javascript">
+      var _paq = window._paq || [];
+      /* tracker methods like "setCustomDimension" should be called before "trackPageView" */
+      _paq.push(["setDocumentTitle", document.domain + "/" + document.title]);
+      _paq.push(["setCookieDomain", "*.flaport.net"]);
+      _paq.push(["setDoNotTrack", true]);
+      _paq.push(["trackPageView"]);
+      _paq.push(["enableLinkTracking"]);
+      (function () {
+        var u = "//matomo.flaport.net/";
+        _paq.push(["setTrackerUrl", u + "matomo.php"]);
+        _paq.push(["setSiteId", "1"]);
+        var d = document,
+          g = d.createElement("script"),
+          s = d.getElementsByTagName("script")[0];
+        g.type = "text/javascript";
+        g.async = true;
+        g.defer = true;
+        g.src = u + "matomo.js";
+        s.parentNode.insertBefore(g, s);
+      })();
+    </script>
+    <!-- End Matomo Code -->
   </head>
   <body>
     <div class="document">
       <div class="contentwrapper">
-
-          <div class="noprint" align="right">
-          <span class="fa tooltip hideborder" style="cursor: default">
-                &nbsp;
-                <span class="tooltiptext">toggle dark mode</span>
+        <div class="noprint" align="right">
+          <span class="fa tooltip hideborder" style="cursor: default;">
+            &nbsp;
+            <span class="tooltiptext">toggle dark mode</span>
           </span>
-          <span class="fa tooltip hideborder" style="cursor: default">
-                <input type="checkbox" class="noprint" id="darkmodetoggle"/>
-                <span class="tooltiptext">toggle dark mode</span>
+          <span class="fa tooltip hideborder" style="cursor: default;">
+            <input type="checkbox" class="noprint" id="darkmodetoggle" />
+            <span class="tooltiptext">toggle dark mode</span>
           </span>
-          </div>
-
+        </div>
 
         <div class="content">
-            
+          
     <h1> Play tic-tac-toe against a reinforcement agent </h1>
 <!-- author: Flaport&nbsp;&middot; -->
 posted on <a href="#" class="date">2020-05-30T11:27:03Z</a>
 
-&middot;&nbsp;last modified on <a href="#" class="date">2020-06-01T15:11:13Z</a>
+&middot;&nbsp;last modified on <a href="#" class="date">2020-06-10T11:53:21Z</a>
 
+&middot;&nbsp;view page on <a href="https://github.com/flaport/blog/blob/master/posts/reinforcement-learning-part-3.html">GitHub</a>
 
 <div style="padding-top: 3pt">
 tags:
 
     
 
-<a class="tag tooltip" href="/tags/ml/">ml<sup>&nbsp;(4)</sup><span class="tooltiptext">machine learning</span></a>
+<a class="tag tooltip" href="/tags/ml/">ml<sup>&nbsp;(7)</sup><span class="tooltiptext">machine learning</span></a>
 
 
 
@@ -88,11 +106,9 @@ tags:
 
 </div>
 
-<p> I finally got around on making an unbeatable tic-tac-toe game. Based of
-course on
-<a href="/reinforcement-learning-part-1.html">RL part 1</a> and
-<a href="/reinforcement-learning-part-2.html">RL part 2</a>.
-Have fun! </p>
+<p> I finally made an unbeatable tic-tac-toe game in javascript using the
+qtable obtained in in the <a href="/reinforcement-learning-part-1.html">first
+reinforcement learning post</a>. Have Fun going for the tie! </p>
 
 <style>
 .ttt-wrapper {
@@ -112,43 +128,56 @@ Have fun! </p>
   text-align: center;
   font-size: 80px;
   cursor: pointer;
-  background-color: #88888888;
+  background-color: #AAAAAAAA;
 }
 .ttt-cell#ttt-a {
   font-size: 24px;
-  background-color: #0000ff88;
+  background-color: #5e81ac;
 }
 .ttt-cell#ttt-b {
   font-size: 24px;
-  background-color: #0000ff88;
+  background-color: #5e81ac;
 }
 .ttt-cell#ttt-c {
   font-size: 24px;
-  background-color: #ff000088;
+  background-color: #bf616a;
+}
+#ttt-msg {
+  font-size: 24px;
 }
 .emoji {
-  padding-top: 10px;
   font-size: 40px;
+  padding-top: 10px;
 }
 </style>
 
-    <div class="ttt-wrapper">
-        <div class="ttt-grid">
-            <div class="ttt-cell" id="ttt-1"></div>
-            <div class="ttt-cell" id="ttt-2"></div>
-            <div class="ttt-cell" id="ttt-3"></div>
-            <div class="ttt-cell" id="ttt-4"></div>
-            <div class="ttt-cell" id="ttt-5"></div>
-            <div class="ttt-cell" id="ttt-6"></div>
-            <div class="ttt-cell" id="ttt-7"></div>
-            <div class="ttt-cell" id="ttt-8"></div>
-            <div class="ttt-cell" id="ttt-9"></div>
-            <div class="ttt-cell" id="ttt-a">Player O<div class="emoji" id="ttt-playerO">🤓</div></div>
-            <div class="ttt-cell" id="ttt-b">Player X<div class="emoji" id="ttt-playerX">🤖</div></div>
-            <div class="ttt-cell" id="ttt-c">Restart<div class="emoji">↩</div></div>
-        </div>
+
+<h2 id="Game">Game<a class="anchor-link" href="#Game">&#182;</a></h2>
+
+<div class="ttt-wrapper">
+    <div class="ttt-grid">
+        <div class="ttt-cell" id="ttt-1"></div>
+        <div class="ttt-cell" id="ttt-2"></div>
+        <div class="ttt-cell" id="ttt-3"></div>
+        <div class="ttt-cell" id="ttt-4"></div>
+        <div class="ttt-cell" id="ttt-5"></div>
+        <div class="ttt-cell" id="ttt-6"></div>
+        <div class="ttt-cell" id="ttt-7"></div>
+        <div class="ttt-cell" id="ttt-8"></div>
+        <div class="ttt-cell" id="ttt-9"></div>
+        <div class="ttt-cell" id="ttt-a">Player O<div class="emoji" id="ttt-playerO">🤓</div></div>
+        <div class="ttt-cell" id="ttt-b">Player X<div class="emoji" id="ttt-playerX">🤖</div></div>
+        <div class="ttt-cell" id="ttt-c">Restart<div class="emoji">↩</div></div>
     </div>
-    <div id="ttt-msg">Player O's turn</div>
+    <p><span id="ttt-msg">Player O's turn</span></p>
+</div>
+
+<h2 id="Index">Index<a class="anchor-link" href="#Index">&#182;</a></h2><ul>
+<li><a href="/reinforcement-learning-part-1.html">part 1</a>: We create the game environment and a simple unbeatable AI based on <em>traditional</em> Q-learning 🤖.</li>
+<li><a href="/reinforcement-learning-part-2.html">part 2</a>: We modify our AI to utilize a neural network: <em>deep</em> Q-learning 👾.</li>
+<li><a href="/reinforcement-learning-part-3.html">part 3</a>: Have some fun and play against the Q-agent 🤓.</li>
+</ul>
+
 <script>
 // @license magnet:?xt=urn:btih:1f739d935676111cfff4b4693e3816e664797050&dn=gpl-3.0.txt GPL-3.0"
 var arr = [0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -258,6 +287,10 @@ document.getElementById("ttt-c").addEventListener("click",function(e){restart();
 </script>
 
 
+<br>
+<hr>
+If you like this post, consider leaving a comment or <a href="https://github.com/flaport/blog/blob/master/posts/reinforcement-learning-part-3.html">star it on GitHub</a>.
+
 <script data-isso="//isso.flaport.net/" src="//isso.flaport.net/js/embed.min.js"></script>
 <style>
 #isso-thread > h4 {
@@ -273,125 +306,146 @@ document.getElementById("ttt-c").addEventListener("click",function(e){restart();
 
       <div class="sidebar">
         <div class="sidebarwrapper">
-          <h1 class="logo"><a href="/">Flaport.net</a></h1>
+          <img id="logo" src="/static/img/logo.svg" />
           <ul>
-            <li class="toctree-l1">
-              <a href="/">Home</a>
-            </li>
             
             <li class="toctree-l1">
-                Tag: <a href="/tags/game/">game</a>
-                
-                
-                
-                <a class="fa tooltip hideborder" href="/reinforcement-learning-part-3.html">
-                <span class="tooltiptext">exit [game] tag view</span>
-                </a>
+              <span class="fa"></span>&nbsp;<a href="/">Home</a>
             </li>
-            
-            
-            
-            
-            <h3 style="padding-top: 1em;">Tags</h3>
-            
+             
+            <li class="toctree-l1">
+              <span class="fa" style="font-size: 14px;"></span>&nbsp;<a
+                href="/tags/game/"
+                >game</a
+              >
                 
+              <a class="fa tooltip hideborder" href="/reinforcement-learning-part-3.html"
+                >
+                <span class="tooltiptext"
+                  >exit [game] tag view</span
+                >
+              </a>
+            </li>
+               
+            <h3 style="padding-top: 1em;">
+              Tags&nbsp;<span class="fa" style="font-size: 18px;"></span>
+            </h3>
+             
 
-<a class="tag tooltip" href="/tags/ml/">ml<sup>&nbsp;(4)</sup><span class="tooltiptext">machine learning</span></a>
+<a class="tag tooltip" href="/tags/ml/">ml<sup>&nbsp;(7)</sup><span class="tooltiptext">machine learning</span></a>
 
+  
 
-            
-                
+<a class="tag tooltip" href="/tags/python/">python<sup>&nbsp;(6)</sup></a>
 
-<a class="tag tooltip" href="/tags/python/">python<sup>&nbsp;(3)</sup></a>
+  
 
+<a class="tag tooltip" href="/tags/cv/">cv<sup>&nbsp;(3)</sup><span class="tooltiptext">computer vision</span></a>
 
-            
-                
+  
 
 <a class="tag tooltip" href="/tags/rl/">rl<sup>&nbsp;(3)</sup><span class="tooltiptext">reinforcement learning</span></a>
 
-
-            
-                
+  
 
 <a class="tag tooltip" href="/tags/linux/">linux<sup>&nbsp;(2)</sup></a>
 
+  
 
-            
-                
+<a class="tag tooltip" href="/tags/yolo/">yolo<sup>&nbsp;(2)</sup></a>
 
-<a class="tag tooltip" href="/tags/cv/">cv<sup>&nbsp;(1)</sup><span class="tooltiptext">computer vision</span></a>
+  
 
+<a class="tag tooltip" href="/tags/c++/">c++<sup>&nbsp;(1)</sup></a>
 
-            
-                
+  
 
 <span class="currenttag tooltip">game<sup>&nbsp;(1)</sup></span>
 
-
-            
-                
+  
 
 <a class="tag tooltip" href="/tags/javascript/">javascript<sup>&nbsp;(1)</sup></a>
 
+  
 
-            
-                
+<a class="tag tooltip" href="/tags/jax/">jax<sup>&nbsp;(1)</sup></a>
+
+  
 
 <a class="tag tooltip" href="/tags/vps/">vps<sup>&nbsp;(1)</sup></a>
 
-
-            
-                
-
-<a class="tag tooltip" href="/tags/yolo/">yolo<sup>&nbsp;(1)</sup></a>
-
-
-            
-            <h3 style="padding-top: 1em;">Projects</h3>
+ 
+            <h3 style="padding-top: 1em;">
+              Projects&nbsp;<span class="fa" style="font-size: 18px;"></span>
+            </h3>
             <li class="toctree-l1">
-              <a href="https://photontorch.com"
-                >Photontorch&nbsp;</a
+              <span class="fa"></span>&nbsp;<a href="https://photontorch.com"
+                >Photontorch</a
               >
             </li>
             <li class="toctree-l1">
-              <a href="https://github.com/flaport/fdtd"
-                >Python&nbsp;3D&nbsp;FDTD&nbsp;</a
+              <span class="fa"></span>&nbsp;<a
+                href="https://github.com/flaport/fdtd"
+                >Python&nbsp;3D&nbsp;FDTD</a
               >
             </li>
-            <h3 style="padding-top: 1em;">External links</h3>
-            <li class="toctree-l1">
-                <a href="/index.xml" target="_blank">RSS&nbsp;<span class="fa">&nbsp;</span></a>
-            </li>
-            <li class="toctree-l1">
-              <a href="https://github.com/flaport"
-                >GitHub&nbsp;<span class="fa">&nbsp;</span></a
+            <h3 style="padding-top: 1em;">
+              External links&nbsp;<span class="fa" style="font-size: 18px;"
+                ></span
               >
-            </li>
+            </h3>
             <li class="toctree-l1">
-              <a href="https://twitter.com/florislaporte"
-                >Twitter&nbsp;<span class="fa">&nbsp;</span></a
-              >
-            </li>
-            <li class="toctree-l1">
-              <a href="https://linkedin.com/in/florislaporte"
-                >Linked&nbsp;<span class="fa">&nbsp;</span></a
+              <span class="fa"></span>&nbsp;<a
+                href="/index.xml"
+                target="_blank"
+                >RSS</a
               >
             </li>
             <li class="toctree-l1">
-              <a href="https://www.photonics.intec.ugent.be/contact/people.asp?ID=424"
-                 >Academic&nbsp;Profile&nbsp;<span class="fa"></span>&nbsp;</a
+              <span class="fa"></span>&nbsp;<a
+                href="https://github.com/flaport"
+                >GitHub</a
               >
+            </li>
+            <li class="toctree-l1">
+              <span class="fa"></span>&nbsp;<a
+                href="https://twitter.com/florislaporte"
+                >Twitter</a
+              >
+            </li>
+            <li class="toctree-l1">
+              <span class="fa"></span>&nbsp;<a
+                href="https://linkedin.com/in/florislaporte"
+                >Linked in</a
+              >
+            </li>
+            <li class="toctree-l1">
+              <span class="fa" style="font-size: 72%;"></span>&nbsp;<a
+                href="https://www.photonics.intec.ugent.be/contact/people.asp?ID=424"
+                >Academic&nbsp;Profile</a
+              >
+            </li>
+            <li class="toctree-l1">
+              <span class="fa" style="font-size: 72%;"></span>
+              &nbsp;<a href="/sitemap.xml">Sitemap</a>
             </li>
             <div style="padding-top: 2em;">
-                <span class="fa"></span> Floris Laporte 2020
-                <a href="/static/js/javascript.html" rel="jslicense" style="display: none"> view javascript licenses</a>
+              <span class="fa"></span> Floris Laporte 2020
+              <a
+                href="/static/js/javascript.html"
+                rel="jslicense"
+                style="display: none;"
+              >
+                view javascript licenses</a
+              >
             </div>
           </ul>
+        </div>
       </div>
     </div>
     <script src="/static/js/localdates.js"></script>
     <script src="/static/js/externallinks.js"></script>
     <script src="/static/js/toggledarkmode.js"></script>
+    
   </body>
 </html>

@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+  
+<html lang="en">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    
+    <title>Flaport.net | Creating a Pytorch solver for sparse linear systems</title>
+    
+    
+    <meta name="description" content="Not so long ago, I implemented a wrapper library in PyTorch to solve sparse linear systems on the CPU using the SuiteSparse routines under the hood. My goal is to eventually integrate this sparse solver into my photonic circuit simulator, Photontorch. However, for now, I thought it would be instructive to go over the steps I took to implement both the forward pass and the backward pass of such a custom PyTorch function.">
+    
+    <link rel="shortcut icon" type="image/svg" href="/static/img/icon.svg" />
+    <link rel="stylesheet" href="/static/css/normalize.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/fonts.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/main.css" type="text/css" />
+    <link rel="stylesheet" href="/static/css/colors.css" type="text/css" />
+     
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [
+            ["$", "$"],
+            ["\\(", "\\)"],
+          ],
+        },
+      };
+    </script>
+     
+    <!-- Matomo -->
+    <script type="text/javascript">
+      var _paq = window._paq || [];
+      /* tracker methods like "setCustomDimension" should be called before "trackPageView" */
+      _paq.push(["setDocumentTitle", document.domain + "/" + document.title]);
+      _paq.push(["setCookieDomain", "*.flaport.net"]);
+      _paq.push(["setDoNotTrack", true]);
+      _paq.push(["trackPageView"]);
+      _paq.push(["enableLinkTracking"]);
+      (function () {
+        var u = "//matomo.flaport.net/";
+        _paq.push(["setTrackerUrl", u + "matomo.php"]);
+        _paq.push(["setSiteId", "1"]);
+        var d = document,
+          g = d.createElement("script"),
+          s = d.getElementsByTagName("script")[0];
+        g.type = "text/javascript";
+        g.async = true;
+        g.defer = true;
+        g.src = u + "matomo.js";
+        s.parentNode.insertBefore(g, s);
+      })();
+    </script>
+    <!-- End Matomo Code -->
+  </head>
+  <body>
+    <div class="document">
+      <div class="contentwrapper">
+        <div class="noprint" align="right">
+          <span class="fa tooltip hideborder" style="cursor: default;">
+            &nbsp;
+            <span class="tooltiptext">toggle dark mode</span>
+          </span>
+          <span class="fa tooltip hideborder" style="cursor: default;">
+            <input type="checkbox" class="noprint" id="darkmodetoggle" />
+            <span class="tooltiptext">toggle dark mode</span>
+          </span>
+        </div>
+
+        <div class="content">
+          
+    <h1>Creating a Pytorch solver for sparse linear systems</h1>
+<!-- author: Flaport&nbsp;&middot; -->
+posted on <a href="#" class="date">2020-10-17T11:04:18Z</a>
+
+&middot;&nbsp;view page on <a href="https://github.com/flaport/blog/blob/master/posts/solving-sparse-linear-systems-in-pytorch.ipynb">GitHub</a>
+
+<div style="padding-top: 3pt">
+tags:
+
+    
+
+<a class="tag tooltip" href="/tags/ml/">ml<sup>&nbsp;(7)</sup><span class="tooltiptext">machine learning</span></a>
+
+
+
+    
+
+<span class="currenttag tooltip">python<sup>&nbsp;(6)</sup></span>
+
+
+
+    
+
+<a class="tag tooltip" href="/tags/c++/">c++<sup>&nbsp;(1)</sup></a>
+
+
+
+</div>
+
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Not so long ago, I implemented a <a href="https://github.com/flaport/torch_sparse_solve">wrapper library in PyTorch to solve sparse linear systems</a> on the CPU using the <a href="https://github.com/DrTimothyAldenDavis/SuiteSparse">SuiteSparse</a> routines under the hood. My goal is to eventually integrate this sparse solver into my photonic circuit simulator, <a href="https://github.com/flaport/photontorch">Photontorch</a>. However, for now, I thought it would be instructive to go over the steps I took to implement both the forward pass and the backward pass of such a custom PyTorch function.</p>
+<p>So, with that in mind, the goal of the discussion below is to define a custom PyTorch function that solves the sparse linear system of the form
+$$
+\begin{align}
+Ax &amp;= b
+\end{align}
+$$
+Where $A$ is sparse and $x$ and $b$ are dense.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="A-very-simple-system-of-equations:-Scalar-x-Scalar">A very simple system of equations: Scalar x Scalar<a class="anchor-link" href="#A-very-simple-system-of-equations:-Scalar-x-Scalar">&#182;</a></h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Let's start by implementing the $0D$ case. When $A$ is a $0D$ matrix (i.e. just a normal number or scalar). this system of equations has the following solution:</p>
+\begin{align*}
+    x &amp;= \frac{b}{A}
+\end{align*}<p>Implementing custom functions (with custom forward <strong>and</strong> backward) in PyTorch is usually done by subclassing <code>torch.autograd.Function</code> and defining the <code>forward</code> and <code>backward</code> method for your derived class. For example in the case of our simple linear system with the above solution we can write:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[1]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">torch.autograd</span> <span class="kn">import</span> <span class="n">Function</span>
+
+<span class="k">class</span> <span class="nc">Solve</span><span class="p">(</span><span class="n">Function</span><span class="p">):</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">A</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="mi">1</span> <span class="ow">and</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">==</span><span class="mi">1</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;A should be 0D&quot;</span><span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">save_for_backward</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">b</span> <span class="o">/</span> <span class="n">A</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">backward</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">grad</span><span class="p">):</span>
+        <span class="n">A</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">saved_tensors</span>
+        <span class="k">return</span> <span class="p">(</span><span class="o">-</span><span class="n">b</span><span class="o">/</span><span class="n">A</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">*</span><span class="n">grad</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="n">A</span><span class="p">)</span><span class="o">*</span><span class="n">grad</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>How this works is as follows: the forward pass performs the operation <em>and</em> stores the relevant matrices in the context object <code>ctx</code> for later. This way these matrices can later on be used again during the gradient calculation in the backward pass. In the backward pass, the gradient of the loss $L$ must be calculated with respect to all the inputs of the forward pass ($A$ and $b$ in this case), given the gradients of the loss with respect to the output of the forward pass.</p>
+<p>This means that in this case we need to find the following two transformations to describe the backward pass:
+$$
+\begin{align*}
+    \frac{\partial L}{\partial x} \rightarrow \frac{\partial L}{\partial A} \\
+    \frac{\partial L}{\partial x} \rightarrow \frac{\partial L}{\partial b} 
+\end{align*}
+$$</p>
+<p>By applying the chain rule, we have:</p>
+$$
+\begin{align*}
+    \frac{\partial L}{\partial A} = \frac{\partial L}{\partial x}\frac{\partial x}{\partial A} &amp;&amp;
+    \frac{\partial L}{\partial b} = \frac{\partial L}{\partial x}\frac{\partial x}{\partial b}
+\end{align*} 
+$$<p>Hence defining the backward pass comes down to determining $\frac{\partial x}{\partial A}$ and $\frac{\partial x}{\partial b}$:</p>
+$$
+\begin{align*} 
+    \frac{\partial x}{\partial A} = - \frac{b}{A^2} &amp;&amp;
+    \frac{\partial x}{\partial b} = \frac{1}{A} 
+\end{align*}
+$$
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>These gradients are simple enough to know that we implemented them correctly. However, Pytorch also offers a <code>gradcheck</code> function to check wether we implemented the backward pass correctly:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[2]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">torch.autograd</span> <span class="kn">import</span> <span class="n">gradcheck</span>
+<span class="n">A</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+<span class="n">gradcheck</span><span class="p">(</span><span class="n">Solve</span><span class="o">.</span><span class="n">apply</span><span class="p">,</span> <span class="p">[</span><span class="n">A</span><span class="o">.</span><span class="n">double</span><span class="p">(),</span> <span class="n">b</span><span class="o">.</span><span class="n">double</span><span class="p">()])</span> <span class="c1"># gradcheck requires double precision</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[2]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>True</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Here, we used <code>Solve.apply</code> to use the function during <code>gradcheck</code>. It is common in PyTorch to actually alias this to a lowercase function name:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[3]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">solve</span> <span class="o">=</span> <span class="n">Solve</span><span class="o">.</span><span class="n">apply</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="A-more-general-system:-Matrix-&#215;-Vector">A more general system: Matrix &#215; Vector<a class="anchor-link" href="#A-more-general-system:-Matrix-&#215;-Vector">&#182;</a></h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Ok, what we implemented above was quite trivial, but mostly served as an example on how the forward and backward of custom functions are implemented in PyTorch. Now that's behind us we can go on to more interesting domains... general systems where A is a square, $2D$ matrix acting on a $1D$ vector.</p>
+<p>As we know, the solution to the system of equation becomes in this case:</p>
+$$
+\begin{align*}
+    x = A^{-1} \, b
+\end{align*}
+$$
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>However, calculating $A^{-1}$ is an expensive operation and should be avoided. Let's say, for the sake of our story that we want to use <code>scipy.linalg.solve</code>:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[4]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">scipy.linalg</span> <span class="kn">import</span> <span class="n">solve</span> <span class="k">as</span> <span class="n">scipy_solve</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Sidenote: Pytorch actually has a <code>torch.solve</code> function, which (in contrast to <code>scipy.linalg.solve</code>) works on CUDA GPUs as well. Hence in 99% of the cases this is the function you'll want. However, we go along here with <code>scipy.linalg.solve</code> as hopefully we'll learn something from writing the PyTorch wrapper. At the end of this post, we'll then implement our own sparse solver in C++.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[5]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">Solve</span><span class="p">(</span><span class="n">Function</span><span class="p">):</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">A</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;A should be a square 2D matrix.&quot;</span><span class="p">)</span>
+        <span class="n">A_np</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="n">b_np</span> <span class="o">=</span> <span class="n">b</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="n">x_np</span> <span class="o">=</span> <span class="n">scipy_solve</span><span class="p">(</span><span class="n">A_np</span><span class="p">,</span> <span class="n">b_np</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">x_np</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">save_for_backward</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">backward</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">grad</span><span class="p">):</span>
+        <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">saved_tensors</span>
+        <span class="n">gradb</span> <span class="o">=</span> <span class="n">Solve</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">grad</span><span class="p">)</span>
+        <span class="n">gradA</span> <span class="o">=</span> <span class="o">-</span><span class="n">gradb</span><span class="p">[:,</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">x</span><span class="p">[</span><span class="kc">None</span><span class="p">,:]</span>
+        <span class="k">return</span> <span class="n">gradA</span><span class="p">,</span> <span class="n">gradb</span>
+
+<span class="n">solve</span> <span class="o">=</span> <span class="n">Solve</span><span class="o">.</span><span class="n">apply</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Where we used the following expressions for the gradients:
+$$
+\begin{align*}
+    \frac{\partial L}{\partial b} 
+        &amp;= \frac{\partial L}{\partial x_i} \frac{\partial x_i}{\partial b_j}  \\
+        &amp;= \frac{\partial L}{\partial x_i} \frac{\partial}{\partial b_k} ( A^{-1}_{ij} b_j )  \\
+        &amp;= \frac{\partial L}{\partial x_i} A^{-1}_{ij} \frac{\partial b_j}{\partial b_k}\\
+        &amp;= \frac{\partial L}{\partial x_i} A^{-1}_{ij} \delta_{jk}\\
+        &amp;= \frac{\partial L}{\partial x_i} A^{-1}_{ik} \\
+        &amp;= \big(A^{-1}\big)^{T} \frac{\partial L}{\partial x} \\
+        &amp;= \mathrm{solve}\big( A^T\,,\,\,  \frac{\partial L}{\partial x} \big) \\\\
+\frac{\partial L}{\partial A} 
+        &amp;= \frac{\partial L}{\partial x_i} \frac{\partial x_i}{\partial A_{mn}}  \\
+        &amp;= \frac{\partial L}{\partial x_i} \frac{\partial}{\partial A_{mn}} ( A^{-1}_{ij} b_j ) \\
+        &amp;= -\frac{\partial L}{\partial x_i} A^{-1}_{ij} \frac{\partial A_{jk}}{\partial A_{mn}} A^{-1}_{kl} b_l \\
+        &amp;= -\frac{\partial L}{\partial x_i} A^{-1}_{ij} \delta_{jm} \delta_{kn} A^{-1}_{kl} b_l \\
+        &amp;= -\frac{\partial L}{\partial x_i} A^{-1}_{im} A^{-1}_{nl} b_l \\
+        &amp;= -\left(\big(A^{-1}\big)^{T} \frac{\partial L}{\partial x}\right)\otimes\left( A^{-1} b \right) \\
+        &amp;= -\frac{\partial L}{\partial b} \otimes x
+\end{align*}
+$$
+where we used the einstein summation convention during the derivations. We also used the following identity:
+$$
+\frac{\partial (A^{-1})}{\partial p} = - A^{-1} \frac{\partial A}{\partial p} A^{-1}.
+$$</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>We can check that the backward pass was implemented correctly:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[6]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">A</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">gradcheck</span><span class="p">(</span><span class="n">solve</span><span class="p">,</span> <span class="p">[</span><span class="n">A</span><span class="o">.</span><span class="n">double</span><span class="p">(),</span> <span class="n">b</span><span class="o">.</span><span class="n">double</span><span class="p">()])</span> <span class="c1"># gradcheck requires double precision</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[6]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>True</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Even-more-general:-Matrix-&#215;-Matrix">Even more general: Matrix &#215; Matrix<a class="anchor-link" href="#Even-more-general:-Matrix-&#215;-Matrix">&#182;</a></h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>In fact, <code>scipy.linalg.solve</code> also supports Matrix × Matrix systems, hence extending the backward method of the above solver is not so difficult:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[7]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">Solve</span><span class="p">(</span><span class="n">Function</span><span class="p">):</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">A</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;A should be a square 2D matrix.&quot;</span><span class="p">)</span>
+        <span class="n">A_np</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="n">b_np</span> <span class="o">=</span> <span class="n">b</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="n">x_np</span> <span class="o">=</span> <span class="n">scipy_solve</span><span class="p">(</span><span class="n">A_np</span><span class="p">,</span> <span class="n">b_np</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">x_np</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">save_for_backward</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">backward</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">grad</span><span class="p">):</span>
+        <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">saved_tensors</span>
+        <span class="n">gradb</span> <span class="o">=</span> <span class="n">Solve</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">grad</span><span class="p">)</span>
+        <span class="n">gradA</span> <span class="o">=</span> <span class="o">-</span><span class="n">gradb</span> <span class="o">@</span> <span class="n">x</span><span class="o">.</span><span class="n">T</span>
+        <span class="k">return</span> <span class="n">gradA</span><span class="p">,</span> <span class="n">gradb</span>
+
+<span class="n">solve</span> <span class="o">=</span> <span class="n">Solve</span><span class="o">.</span><span class="n">apply</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Where we used a slightly different derivation as above, taking into account that $x$ and $b$ are $m\times n$ matrices (and $A$ remains an $m\times m$ matrix):</p>
+$$
+\begin{align*}
+    \frac{\partial L}{\partial b}
+        &amp;= \frac{\partial L}{\partial x_{ij}} \frac{\partial x_{ij}}{\partial b_{kl}}  \\
+        &amp;= \frac{\partial L}{\partial x_{ij}} A^{-1}_{ik} \frac{\partial b_{kj}}{\partial b_{lm}}\\
+        &amp;= \frac{\partial L}{\partial x_{ij}} A^{-1}_{ik} \delta_{kl}\delta_{jm}\\
+        &amp;= \frac{\partial L}{\partial x_{im}} A^{-1}_{il}\\
+        &amp;= \big(A^{-1}\big)^{T} \frac{\partial L}{\partial x} \\
+        &amp;= \mathrm{solve}\big( A^T\,,\,\,  \frac{\partial L}{\partial x} \big) \\\\
+\frac{\partial L}{\partial A} 
+        &amp;= \frac{\partial L}{\partial x_{ij}} \frac{\partial x_{ij}}{\partial A_{mn}}  \\
+        &amp;= \frac{\partial L}{\partial x_{ij}} \frac{\partial}{\partial A_{mn}} ( A^{-1}_{ik} b_{kj} ) \\
+        &amp;= -\frac{\partial L}{\partial x_{ij}} A^{-1}_{ik} \frac{\partial A_{kl}}{\partial A_{mn}} A^{-1}_{lp} b_{pj} \\
+        &amp;= -\frac{\partial L}{\partial x_{ij}} A^{-1}_{ik} \delta_{km} \delta_{ln} A^{-1}_{lp} b_{pj} \\
+        &amp;= -\frac{\partial L}{\partial x_{ij}} A^{-1}_{im} A^{-1}_{np} b_{pj} \\
+        &amp;= -\left(\big(A^{-1}\big)^{T} \frac{\partial L}{\partial x}\right)\left( A^{-1} b \right)^T \\
+        &amp;= -\frac{\partial L}{\partial b} x^T
+\end{align*}
+$$
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[8]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">A</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">gradcheck</span><span class="p">(</span><span class="n">solve</span><span class="p">,</span> <span class="p">[</span><span class="n">A</span><span class="o">.</span><span class="n">double</span><span class="p">(),</span> <span class="n">b</span><span class="o">.</span><span class="n">double</span><span class="p">()])</span> <span class="c1"># gradcheck requires double precision</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[8]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>True</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Most-general:-Batched-Matrix-&#215;-Batched-Matrix">Most general: Batched Matrix &#215; Batched Matrix<a class="anchor-link" href="#Most-general:-Batched-Matrix-&#215;-Batched-Matrix">&#182;</a></h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>The above Matrix $\times$ Matrix system is easily extended to a batched version (with the batch dimension being the first dimension):</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[9]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">Solve</span><span class="p">(</span><span class="n">Function</span><span class="p">):</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">A</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">3</span> <span class="ow">or</span> <span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;A should be a batch of square 2D matrices with shape (b, m, m)&quot;</span><span class="p">)</span>
+        <span class="n">A_np</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="n">b_np</span> <span class="o">=</span> <span class="n">b</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="n">x_np</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">scipy_solve</span><span class="p">(</span><span class="n">A_np</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">b_np</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])],</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">x_np</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">save_for_backward</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">backward</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">grad</span><span class="p">):</span>
+        <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">saved_tensors</span>
+        <span class="n">gradb</span> <span class="o">=</span> <span class="n">Solve</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mi">2</span><span class="p">),</span> <span class="n">grad</span><span class="p">)</span>
+        <span class="n">gradA</span> <span class="o">=</span> <span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">bmm</span><span class="p">(</span><span class="n">gradb</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mi">2</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">gradA</span><span class="p">,</span> <span class="n">gradb</span>
+
+<span class="n">solve</span> <span class="o">=</span> <span class="n">Solve</span><span class="o">.</span><span class="n">apply</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[10]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">A</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">gradcheck</span><span class="p">(</span><span class="n">solve</span><span class="p">,</span> <span class="p">[</span><span class="n">A</span><span class="o">.</span><span class="n">double</span><span class="p">(),</span> <span class="n">b</span><span class="o">.</span><span class="n">double</span><span class="p">()])</span> <span class="c1"># gradcheck requires double precision</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[10]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>True</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Making-a-C++-extension">Making a C++ extension<a class="anchor-link" href="#Making-a-C++-extension">&#182;</a></h2><p>Let's now go on to make the above module in C++. However, we won't do this with the imported scipy function. For now, we'll just use <code>torch.inverse</code> when we need it. Just know, that after we get this simple C++ PyTorch extension to work, we'll swap out <code>torch.inverse</code> for our own C++ solver.</p>
+<p>We'll start by making a file called <code>solve.cpp</code>, which includes the following two headers:</p>
+<div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;torch/extension.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;ATen/ATen.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;vector&gt;</span><span class="cp"></span>
+</pre></div>
+<p>Generally speaking, <code>torch/extension.h</code> implements equivalent C++ functions to what <code>torch</code> offers in python, while <code>ATen/ATen.h</code> offers Python Tensor <em>methods</em> as C++ <em>functions</em>. The <code>vector</code> header is needed when returning more than one tensor (as we'll do in the backward).</p>
+<p>Hence the batched matrix x batched matrix forward can be implemented in C++ as follows (remember we'll swap out <code>torch::inverse</code> for an actual solver later):</p>
+<div class="highlight"><pre><span></span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">solve_forward</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">A</span><span class="p">,</span> <span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">b</span><span class="p">){</span>
+  <span class="k">auto</span> <span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">b</span><span class="p">);</span>
+  <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">at</span><span class="o">::</span><span class="n">size</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span> <span class="n">i</span><span class="o">++</span><span class="p">){</span>
+      <span class="n">result</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">mm</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">inverse</span><span class="p">(</span><span class="n">A</span><span class="p">[</span><span class="n">i</span><span class="p">]),</span> <span class="n">b</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span> <span class="c1">// we&#39;ll use an actual solver later.</span>
+  <span class="p">}</span>
+  <span class="k">return</span> <span class="n">result</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+<p>Implementing the backward pass can also be done relatively easily:</p>
+<div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&gt;</span> <span class="n">solve_backward</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">grad</span><span class="p">,</span> <span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">A</span><span class="p">,</span> <span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">b</span><span class="p">,</span> <span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">x</span><span class="p">){</span>
+    <span class="k">auto</span> <span class="n">gradb</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">transpose</span><span class="p">(</span><span class="n">solve_forward</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">transpose</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="mi">-1</span><span class="p">,</span> <span class="mi">-2</span><span class="p">),</span> <span class="n">grad</span><span class="p">),</span> <span class="mi">-1</span><span class="p">,</span> <span class="mi">-2</span><span class="p">);</span>
+    <span class="k">auto</span> <span class="n">gradA</span> <span class="o">=</span> <span class="o">-</span><span class="n">torch</span><span class="o">::</span><span class="n">bmm</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">transpose</span><span class="p">(</span><span class="n">gradb</span><span class="p">,</span> <span class="mi">-1</span><span class="p">,</span> <span class="mi">-2</span><span class="p">),</span> <span class="n">at</span><span class="o">::</span><span class="n">transpose</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mi">-1</span><span class="p">,</span> <span class="mi">-2</span><span class="p">));</span>
+    <span class="k">return</span> <span class="p">{</span><span class="n">gradA</span><span class="p">,</span> <span class="n">gradb</span><span class="p">};</span>
+<span class="p">}</span>
+</pre></div>
+<p>Notice that we're returning a <em>vector</em> of tensors here, hence why we needed to include <code>vector</code> earlier.</p>
+<p>Finally, we need to register the C++ functions defined as python functions. This is done with pybind:</p>
+<div class="highlight"><pre><span></span><span class="n">PYBIND11_MODULE</span><span class="p">(</span><span class="n">TORCH_EXTENSION_NAME</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">m</span><span class="p">.</span><span class="n">def</span><span class="p">(</span><span class="s">&quot;forward&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">solve_forward</span><span class="p">,</span> <span class="s">&quot;solve forward&quot;</span><span class="p">);</span>
+  <span class="n">m</span><span class="p">.</span><span class="n">def</span><span class="p">(</span><span class="s">&quot;backward&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">solve_backward</span><span class="p">,</span> <span class="s">&quot;solve backward&quot;</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+<p>Here the macro <code>TORCH_EXTENSION_NAME</code> will be replaced during compilation to the name of the torch extension defined in the <code>setup.py</code> file. The <code>setup.py</code> file looks as follows:</p>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">setuptools</span> <span class="kn">import</span> <span class="n">setup</span><span class="p">,</span> <span class="n">Extension</span>
+<span class="kn">from</span> <span class="nn">torch.utils</span> <span class="kn">import</span> <span class="n">cpp_extension</span>
+
+<span class="n">solve_cpp</span> <span class="o">=</span> <span class="n">Extension</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;solve_cpp&quot;</span><span class="p">,</span>
+    <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;solve.cpp&quot;</span><span class="p">],</span>
+    <span class="n">include_dirs</span><span class="o">=</span><span class="n">cpp_extension</span><span class="o">.</span><span class="n">include_paths</span><span class="p">(),</span>
+    <span class="n">library_dirs</span><span class="o">=</span><span class="n">cpp_extension</span><span class="o">.</span><span class="n">library_paths</span><span class="p">(),</span>
+    <span class="n">extra_compile_args</span><span class="o">=</span><span class="p">[],</span>
+    <span class="n">libraries</span><span class="o">=</span><span class="p">[</span>
+        <span class="s2">&quot;c10&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;torch&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;torch_cpu&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;torch_python&quot;</span><span class="p">,</span>
+    <span class="p">],</span>
+    <span class="n">language</span><span class="o">=</span><span class="s2">&quot;c++&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">setup</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;solve&quot;</span><span class="p">,</span>
+    <span class="n">ext_modules</span><span class="o">=</span><span class="p">[</span><span class="n">solve_cpp</span><span class="p">],</span>
+    <span class="n">cmdclass</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;build_ext&quot;</span><span class="p">:</span> <span class="n">cpp_extension</span><span class="o">.</span><span class="n">BuildExtension</span><span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+<p>The C++ extension can now be compiled as follows:</p>
+<div class="highlight"><pre><span></span>python setup.py install
+</pre></div>
+<p>Which will create a python executable (<code>.so</code> file on linux, <code>.pyd</code> file on windows) in your python's <code>site-packages</code> folder (i.e. it will be in your python path).</p>
+<p>The only thing that's left is creating a thin wrapper in python:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[11]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span> <span class="c1"># always import torch BEFORE your custom torch extension</span>
+<span class="kn">import</span> <span class="nn">solve_cpp</span> <span class="c1"># the custom torch extension we just created</span>
+
+<span class="k">class</span> <span class="nc">Solve</span><span class="p">(</span><span class="n">Function</span><span class="p">):</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">A</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">3</span> <span class="ow">or</span> <span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;A should be a batch of square 2D matrices with shape (b, m, m)&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">b</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;b should be a batch of matrices with shape (b, m, n)&quot;</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">solve_cpp</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">save_for_backward</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">backward</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">grad</span><span class="p">):</span>
+        <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">saved_tensors</span>
+        <span class="n">gradA</span><span class="p">,</span> <span class="n">gradb</span> <span class="o">=</span> <span class="n">solve_cpp</span><span class="o">.</span><span class="n">backward</span><span class="p">(</span><span class="n">grad</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">gradA</span><span class="p">,</span> <span class="n">gradb</span>
+
+<span class="n">solve</span> <span class="o">=</span> <span class="n">Solve</span><span class="o">.</span><span class="n">apply</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[12]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">A</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">gradcheck</span><span class="p">(</span><span class="n">solve</span><span class="p">,</span> <span class="p">[</span><span class="n">A</span><span class="o">.</span><span class="n">double</span><span class="p">(),</span> <span class="n">b</span><span class="o">.</span><span class="n">double</span><span class="p">()])</span> <span class="c1"># gradcheck requires double precision</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[12]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>True</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Towards-a-sparse-solver-for-CPU-tensors">Towards a sparse solver for CPU tensors<a class="anchor-link" href="#Towards-a-sparse-solver-for-CPU-tensors">&#182;</a></h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>OK, so now we have a representation for the backward pass and we know how to make a Pytorch C++ extension. Let's go on to make an actual sparse solver.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>To create such a sparse solver, we'll wrap the <a href="https://github.com/DrTimothyAldenDavis/SuiteSparse">SuiteSparse</a> routines in our C++ extension. In particular, we'll wrap the <a href="https://ufdc.ufl.edu/UFE0011721/00001">KLU algorithm</a> provided by this library. The KLU sparse linear system solver is a very efficient solver for sparse matrices that arise from circuit simulation netlists. This means it will be most efficient for very sparse systems with often only one element per column of the (connection-)matrix. Obviously, it can tackle different linear systems of equations as well, but that's what it was originally intended for.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>To use the KLU algorithm, we'll have to add the <code>klu</code> header from the <code>SuiteSparse</code> library to the three headers we had in the C++ extension before.</p>
+<div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;torch/extension.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;ATen/ATen.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;vector&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;klu.h&gt;</span><span class="cp"></span>
+</pre></div>
+<p>Note that with the <a href="https://www.anaconda.com/">Anaconda distribution</a> you can simply do a</p>
+<div class="highlight"><pre><span></span>conda install suitesparse
+</pre></div>
+<p>to pull in all the SuiteSparse C++ libraries.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>However, before we can go on to solving the sparse system with the KLU algorithm, there's one more hurdle to overcome:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Sparse-COO--&gt;-Sparse-CSC">Sparse COO -&gt; Sparse CSC<a class="anchor-link" href="#Sparse-COO--&gt;-Sparse-CSC">&#182;</a></h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>The KLU algorithm expects the sparse matrix to be in <a href="https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_column_(CSC_or_CCS">CSC-format</a>) rather than <a href="https://en.wikipedia.org/wiki/Sparse_matrix#Coordinate_list_(COO">COO-format</a>), the standard representation used in PyTorch. To do this conversion, we can have a look at how scipy does this conversion, and do something similar for our COO-pytorch tensors:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">at</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&gt;</span> <span class="n">_coo_to_csc</span><span class="p">(</span><span class="kt">int</span> <span class="n">ncol</span><span class="p">,</span> <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">Ai</span><span class="p">,</span> <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">Aj</span><span class="p">,</span> <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">Ax</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kt">int</span> <span class="n">nnz</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">size</span><span class="p">(</span><span class="n">Ax</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="n">at</span><span class="o">::</span><span class="n">TensorOptions</span> <span class="n">options</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">TensorOptions</span><span class="p">().</span><span class="n">dtype</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kInt32</span><span class="p">).</span><span class="n">device</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">device_of</span><span class="p">(</span><span class="n">Ai</span><span class="p">));</span>
+    <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">Bp</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">zeros</span><span class="p">(</span><span class="n">ncol</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">options</span><span class="p">);</span>
+    <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">Bi</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">Ai</span><span class="p">);</span>
+    <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">Bx</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">Ax</span><span class="p">);</span>
+
+    <span class="kt">int</span><span class="o">*</span> <span class="n">ai</span> <span class="o">=</span> <span class="n">Ai</span><span class="p">.</span><span class="n">data_ptr</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">();</span>
+    <span class="kt">int</span><span class="o">*</span> <span class="n">aj</span> <span class="o">=</span> <span class="n">Aj</span><span class="p">.</span><span class="n">data_ptr</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">();</span>
+    <span class="kt">double</span><span class="o">*</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">Ax</span><span class="p">.</span><span class="n">data_ptr</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">();</span>
+
+    <span class="kt">int</span><span class="o">*</span> <span class="n">bp</span> <span class="o">=</span> <span class="n">Bp</span><span class="p">.</span><span class="n">data_ptr</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">();</span>
+    <span class="kt">int</span><span class="o">*</span> <span class="n">bi</span> <span class="o">=</span> <span class="n">Bi</span><span class="p">.</span><span class="n">data_ptr</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">();</span>
+    <span class="kt">double</span><span class="o">*</span> <span class="n">bx</span> <span class="o">=</span> <span class="n">Bx</span><span class="p">.</span><span class="n">data_ptr</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">();</span>
+
+    <span class="c1">//compute number of non-zero entries per row of A</span>
+    <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="n">nnz</span><span class="p">;</span> <span class="n">n</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">bp</span><span class="p">[</span><span class="n">aj</span><span class="p">[</span><span class="n">n</span><span class="p">]]</span> <span class="o">+=</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="c1">//cumsum the nnz per row to get Bp</span>
+    <span class="kt">int</span> <span class="n">cumsum</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="kt">int</span> <span class="n">temp</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="k">for</span><span class="p">(</span><span class="kt">int</span> <span class="n">j</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">ncol</span><span class="p">;</span> <span class="n">j</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">temp</span> <span class="o">=</span> <span class="n">bp</span><span class="p">[</span><span class="n">j</span><span class="p">];</span>
+        <span class="n">bp</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">cumsum</span><span class="p">;</span>
+        <span class="n">cumsum</span> <span class="o">+=</span> <span class="n">temp</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">bp</span><span class="p">[</span><span class="n">ncol</span><span class="p">]</span> <span class="o">=</span> <span class="n">nnz</span><span class="p">;</span>
+
+    <span class="c1">//write Ai, Ax into Bi, Bx</span>
+    <span class="kt">int</span> <span class="n">col</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="kt">int</span> <span class="n">dest</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="k">for</span><span class="p">(</span><span class="kt">int</span> <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="n">nnz</span><span class="p">;</span> <span class="n">n</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">col</span> <span class="o">=</span> <span class="n">aj</span><span class="p">[</span><span class="n">n</span><span class="p">];</span>
+        <span class="n">dest</span> <span class="o">=</span> <span class="n">bp</span><span class="p">[</span><span class="n">col</span><span class="p">];</span>
+        <span class="n">bi</span><span class="p">[</span><span class="n">dest</span><span class="p">]</span> <span class="o">=</span> <span class="n">ai</span><span class="p">[</span><span class="n">n</span><span class="p">];</span>
+        <span class="n">bx</span><span class="p">[</span><span class="n">dest</span><span class="p">]</span> <span class="o">=</span> <span class="n">ax</span><span class="p">[</span><span class="n">n</span><span class="p">];</span>
+        <span class="n">bp</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="kt">int</span> <span class="n">last</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="k">for</span><span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;=</span> <span class="n">ncol</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">temp</span> <span class="o">=</span> <span class="n">bp</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+        <span class="n">bp</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">last</span><span class="p">;</span>
+        <span class="n">last</span> <span class="o">=</span> <span class="n">temp</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="p">{</span><span class="n">Bp</span><span class="p">,</span> <span class="n">Bi</span><span class="p">,</span> <span class="n">Bx</span><span class="p">};</span>
+<span class="p">}</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Note that we're converting the PyTorch CPU tensor to a C-array (by asking for its pointer). This means that this conversion will be CPU-only. However, performing this conversion on native pytorch tensors would be <strong>a lot</strong> slower.</p>
+<p>This function returns three pytorch tensors: <code>Bp</code>: the column pointers, <code>Bi</code>: the indices in each column and <code>Bx</code>: the values of the sparse tensor.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="KLU-Solver">KLU Solver<a class="anchor-link" href="#KLU-Solver">&#182;</a></h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Using these three vectors, one can define a KLU solver, by wrapping the KLU routines as follows:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<div class="highlight"><pre><span></span><span class="kt">void</span> <span class="nf">_klu_solve</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">Ap</span><span class="p">,</span> <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">Ai</span><span class="p">,</span> <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">Ax</span><span class="p">,</span> <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">b</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kt">int</span> <span class="n">ncol</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">size</span><span class="p">(</span><span class="n">Ap</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="kt">int</span> <span class="n">nb</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">size</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="kt">int</span><span class="o">*</span> <span class="n">ap</span> <span class="o">=</span> <span class="n">Ap</span><span class="p">.</span><span class="n">data_ptr</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">();</span>
+    <span class="kt">int</span><span class="o">*</span> <span class="n">ai</span> <span class="o">=</span> <span class="n">Ai</span><span class="p">.</span><span class="n">data_ptr</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">();</span>
+    <span class="kt">double</span><span class="o">*</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">Ax</span><span class="p">.</span><span class="n">data_ptr</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">();</span>
+    <span class="kt">double</span><span class="o">*</span> <span class="n">bb</span> <span class="o">=</span> <span class="n">b</span><span class="p">.</span><span class="n">data_ptr</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">();</span>
+    <span class="n">klu_symbolic</span><span class="o">*</span> <span class="n">Symbolic</span><span class="p">;</span>
+    <span class="n">klu_numeric</span><span class="o">*</span> <span class="n">Numeric</span><span class="p">;</span>
+    <span class="n">klu_common</span> <span class="n">Common</span><span class="p">;</span>
+    <span class="n">klu_defaults</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Common</span><span class="p">);</span>
+    <span class="n">Symbolic</span> <span class="o">=</span> <span class="n">klu_analyze</span><span class="p">(</span><span class="n">ncol</span><span class="p">,</span> <span class="n">ap</span><span class="p">,</span> <span class="n">ai</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">Common</span><span class="p">);</span>
+    <span class="n">Numeric</span> <span class="o">=</span> <span class="n">klu_factor</span><span class="p">(</span><span class="n">ap</span><span class="p">,</span> <span class="n">ai</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="n">Symbolic</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">Common</span><span class="p">);</span>
+    <span class="n">klu_solve</span><span class="p">(</span><span class="n">Symbolic</span><span class="p">,</span> <span class="n">Numeric</span><span class="p">,</span> <span class="n">ncol</span><span class="p">,</span> <span class="n">nb</span><span class="o">/</span><span class="n">ncol</span><span class="p">,</span> <span class="n">bb</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">Common</span><span class="p">);</span>
+    <span class="n">klu_free_symbolic</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Symbolic</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">Common</span><span class="p">);</span>
+    <span class="n">klu_free_numeric</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Numeric</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">Common</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Using the KLU algorithms comes down to first doing a symbolic analyzation and factorization of the sparse matrix <code>A</code> (i.e. <code>Ap</code>, <code>Ai</code> and <code>Ax</code>), probably to determine the sparsity pattern after which the system is solved with <code>klu_solve</code>. Note that this is an inplace operation on b, i.e. after solving, the solution <code>x</code> will be in the <code>b</code> tensor.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Updated-Forward">Updated Forward<a class="anchor-link" href="#Updated-Forward">&#182;</a></h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Finally, we can update the forward method by using our <code>_klu_solve</code> wrapper in stead of <code>torch::inverse</code>:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<div class="highlight"><pre><span></span><span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">solve_forward</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">A</span><span class="p">,</span> <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">b</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kt">int</span> <span class="n">p</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">size</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="kt">int</span> <span class="n">m</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">size</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+    <span class="kt">int</span> <span class="n">n</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">size</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="mi">2</span><span class="p">);</span>
+    <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">bflat</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">clone</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">reshape</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">transpose</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">{</span><span class="n">p</span><span class="p">,</span> <span class="n">m</span><span class="o">*</span><span class="n">n</span><span class="p">}));</span>
+    <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">Ax</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">reshape</span><span class="p">(</span><span class="n">A</span><span class="p">.</span><span class="n">_values</span><span class="p">(),</span> <span class="p">{</span><span class="n">p</span><span class="p">,</span> <span class="mi">-1</span><span class="p">});</span>
+    <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">Ai</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">reshape</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">_cast_Int</span><span class="p">(</span><span class="n">A</span><span class="p">.</span><span class="n">_indices</span><span class="p">()[</span><span class="mi">1</span><span class="p">]),</span> <span class="p">{</span><span class="n">p</span><span class="p">,</span> <span class="mi">-1</span><span class="p">});</span>
+    <span class="n">at</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">Aj</span> <span class="o">=</span> <span class="n">at</span><span class="o">::</span><span class="n">reshape</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">_cast_Int</span><span class="p">(</span><span class="n">A</span><span class="p">.</span><span class="n">_indices</span><span class="p">()[</span><span class="mi">2</span><span class="p">]),</span> <span class="p">{</span><span class="n">p</span><span class="p">,</span> <span class="mi">-1</span><span class="p">});</span>
+    <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">p</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">at</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&gt;</span> <span class="n">Ap_Ai_Ax</span> <span class="o">=</span> <span class="n">_coo_to_csc</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">Ai</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">Aj</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">Ax</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+        <span class="n">_klu_solve</span><span class="p">(</span><span class="n">Ap_Ai_Ax</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">Ap_Ai_Ax</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">Ap_Ai_Ax</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">bflat</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span> <span class="c1">// result will be in bflat</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">at</span><span class="o">::</span><span class="n">transpose</span><span class="p">(</span><span class="n">bflat</span><span class="p">.</span><span class="n">view</span><span class="p">({</span><span class="n">p</span><span class="p">,</span><span class="n">n</span><span class="p">,</span><span class="n">m</span><span class="p">}),</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Updated-Setup">Updated Setup<a class="anchor-link" href="#Updated-Setup">&#182;</a></h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>The <code>setup.py</code> for this extension also becomes a bit more complex, as the SuiteSparse libraries need to be included:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">glob</span>
+<span class="kn">from</span> <span class="nn">setuptools</span> <span class="kn">import</span> <span class="n">setup</span><span class="p">,</span> <span class="n">Extension</span>
+<span class="kn">from</span> <span class="nn">torch.utils</span> <span class="kn">import</span> <span class="n">cpp_extension</span>
+
+<span class="n">libroot</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="vm">__file__</span><span class="p">))</span>
+<span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;nt&quot;</span><span class="p">:</span>  <span class="c1"># Windows</span>
+    <span class="n">suitesparse_lib</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">libroot</span><span class="p">,</span> <span class="s2">&quot;Library&quot;</span><span class="p">,</span> <span class="s2">&quot;lib&quot;</span><span class="p">)</span>
+    <span class="n">suitesparse_include</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">libroot</span><span class="p">,</span> <span class="s2">&quot;Library&quot;</span><span class="p">,</span> <span class="s2">&quot;include&quot;</span><span class="p">,</span> <span class="s2">&quot;suitesparse&quot;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>  <span class="c1"># Linux / Mac OS</span>
+    <span class="n">suitesparse_lib</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">libroot</span><span class="p">),</span> <span class="s2">&quot;lib&quot;</span><span class="p">)</span>
+    <span class="n">suitesparse_include</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">libroot</span><span class="p">),</span> <span class="s2">&quot;include&quot;</span><span class="p">)</span>
+
+<span class="n">torch_sparse_solve_cpp</span> <span class="o">=</span> <span class="n">Extension</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;torch_sparse_solve_cpp&quot;</span><span class="p">,</span>
+    <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;torch_sparse_solve.cpp&quot;</span><span class="p">],</span>
+    <span class="n">include_dirs</span><span class="o">=</span><span class="p">[</span><span class="o">*</span><span class="n">cpp_extension</span><span class="o">.</span><span class="n">include_paths</span><span class="p">(),</span> <span class="n">suitesparse_include</span><span class="p">],</span>
+    <span class="n">library_dirs</span><span class="o">=</span><span class="p">[</span><span class="o">*</span><span class="n">cpp_extension</span><span class="o">.</span><span class="n">library_paths</span><span class="p">(),</span> <span class="n">suitesparse_lib</span><span class="p">],</span>
+    <span class="n">extra_compile_args</span><span class="o">=</span><span class="p">[],</span>
+    <span class="n">libraries</span><span class="o">=</span><span class="p">[</span>
+        <span class="s2">&quot;c10&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;torch&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;torch_cpu&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;torch_python&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;klu&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;btf&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;amd&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;colamd&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;suitesparseconfig&quot;</span><span class="p">,</span>
+    <span class="p">],</span>
+    <span class="n">language</span><span class="o">=</span><span class="s2">&quot;c++&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">setup</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;torch_sparse_solve&quot;</span><span class="p">,</span>
+    <span class="n">ext_modules</span><span class="o">=</span><span class="p">[</span><span class="n">torch_sparse_solve_cpp</span><span class="p">],</span>
+    <span class="n">cmdclass</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;build_ext&quot;</span><span class="p">:</span> <span class="n">cpp_extension</span><span class="o">.</span><span class="n">BuildExtension</span><span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Updated-python-wrapper">Updated python wrapper<a class="anchor-link" href="#Updated-python-wrapper">&#182;</a></h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>We can update the python wrapper to include the newly built C++ extension:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[13]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">torch_sparse_solve_cpp</span> <span class="kn">import</span> <span class="n">solve_forward</span><span class="p">,</span> <span class="n">solve_backward</span>
+
+<span class="k">class</span> <span class="nc">Solve</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">Function</span><span class="p">):</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">A</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">3</span> <span class="ow">or</span> <span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">A</span><span class="o">.</span><span class="n">is_sparse</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;&#39;A&#39; should be a batch of square 2D sparse matrices with shape (b, m, m).&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">b</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;&#39;b&#39; should be a batch of matrices with shape (b, m, n).&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">A</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;&#39;A&#39; should be a sparse float64 tensor (for now). Please first convert to float64.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">b</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;&#39;b&#39; should be a float64 tensor (for now). Please first convert to float64&quot;</span><span class="p">)</span>
+
+        <span class="n">x</span> <span class="o">=</span> <span class="n">solve_forward</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">save_for_backward</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">backward</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">grad</span><span class="p">):</span>
+        <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">saved_tensors</span>
+        <span class="n">gradA</span><span class="p">,</span> <span class="n">gradb</span> <span class="o">=</span> <span class="n">solve_backward</span><span class="p">(</span><span class="n">grad</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">gradA</span><span class="p">,</span> <span class="n">gradb</span>
+    
+<span class="n">solve</span> <span class="o">=</span> <span class="n">Solve</span><span class="o">.</span><span class="n">apply</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[14]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">mask</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+<span class="n">A</span> <span class="o">=</span> <span class="n">mask</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+<span class="n">Asp</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">to_sparse</span><span class="p">()</span>
+<span class="n">Asp</span><span class="o">.</span><span class="n">requires_grad_</span><span class="p">()</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">gradcheck</span><span class="p">(</span><span class="n">solve</span><span class="p">,</span> <span class="p">[</span><span class="n">Asp</span><span class="p">,</span> <span class="n">b</span><span class="p">],</span> <span class="n">check_sparse_nnz</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> 
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[14]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>True</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="That's-it!">That's it!<a class="anchor-link" href="#That's-it!">&#182;</a></h2><p>Those were the steps I went through creating my first PyTorch C++ extension. Please check it out on GitHub: <a href="https://github.com/flaport/torch_sparse_solve">https://github.com/flaport/torch_sparse_solve</a> and consider giving it a star 😉</p>
+
+</div>
+</div>
+</div>
+ 
+
+
+
+<br>
+<hr>
+If you like this post, consider leaving a comment or <a href="https://github.com/flaport/blog/blob/master/posts/solving-sparse-linear-systems-in-pytorch.ipynb">star it on GitHub</a>.
+
+<script data-isso="//isso.flaport.net/" src="//isso.flaport.net/js/embed.min.js"></script>
+<style>
+#isso-thread > h4 {
+    color: var(--color15);
+    font-weight: bold;
+}
+</style>
+<section id="isso-thread"></section>
+
+
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <div class="sidebarwrapper">
+          <img id="logo" src="/static/img/logo.svg" />
+          <ul>
+            
+            <li class="toctree-l1">
+              <span class="fa"></span>&nbsp;<a href="/">Home</a>
+            </li>
+             
+            <li class="toctree-l1">
+              <span class="fa" style="font-size: 14px;"></span>&nbsp;<a
+                href="/tags/python/"
+                >python</a
+              >
+                
+              <a class="fa tooltip hideborder" href="/solving-sparse-linear-systems-in-pytorch.html"
+                >
+                <span class="tooltiptext"
+                  >exit [python] tag view</span
+                >
+              </a>
+            </li>
+              
+            <li class="toctree-l1">
+              
+              <span class="fa"></span>&nbsp;<a
+                href="/tags/python/fully-connected-neural-network-in-jax.html"
+                >Newer [python] post</a
+              >
+              
+            </li>
+             
+            <li class="toctree-l1">
+              
+              <span class="fa"></span>&nbsp;<a
+                href="/tags/python/yolo-part-2.html"
+                >Older [python] post</a
+              >
+              
+            </li>
+            
+            <h3 style="padding-top: 1em;">
+              Tags&nbsp;<span class="fa" style="font-size: 18px;"></span>
+            </h3>
+             
+
+<a class="tag tooltip" href="/tags/ml/">ml<sup>&nbsp;(7)</sup><span class="tooltiptext">machine learning</span></a>
+
+  
+
+<span class="currenttag tooltip">python<sup>&nbsp;(6)</sup></span>
+
+  
+
+<a class="tag tooltip" href="/tags/cv/">cv<sup>&nbsp;(3)</sup><span class="tooltiptext">computer vision</span></a>
+
+  
+
+<a class="tag tooltip" href="/tags/rl/">rl<sup>&nbsp;(3)</sup><span class="tooltiptext">reinforcement learning</span></a>
+
+  
+
+<a class="tag tooltip" href="/tags/linux/">linux<sup>&nbsp;(2)</sup></a>
+
+  
+
+<a class="tag tooltip" href="/tags/yolo/">yolo<sup>&nbsp;(2)</sup></a>
+
+  
+
+<a class="tag tooltip" href="/tags/c++/">c++<sup>&nbsp;(1)</sup></a>
+
+  
+
+<a class="tag tooltip" href="/tags/game/">game<sup>&nbsp;(1)</sup></a>
+
+  
+
+<a class="tag tooltip" href="/tags/javascript/">javascript<sup>&nbsp;(1)</sup></a>
+
+  
+
+<a class="tag tooltip" href="/tags/jax/">jax<sup>&nbsp;(1)</sup></a>
+
+  
+
+<a class="tag tooltip" href="/tags/vps/">vps<sup>&nbsp;(1)</sup></a>
+
+ 
+            <h3 style="padding-top: 1em;">
+              Projects&nbsp;<span class="fa" style="font-size: 18px;"></span>
+            </h3>
+            <li class="toctree-l1">
+              <span class="fa"></span>&nbsp;<a href="https://photontorch.com"
+                >Photontorch</a
+              >
+            </li>
+            <li class="toctree-l1">
+              <span class="fa"></span>&nbsp;<a
+                href="https://github.com/flaport/fdtd"
+                >Python&nbsp;3D&nbsp;FDTD</a
+              >
+            </li>
+            <h3 style="padding-top: 1em;">
+              External links&nbsp;<span class="fa" style="font-size: 18px;"
+                ></span
+              >
+            </h3>
+            <li class="toctree-l1">
+              <span class="fa"></span>&nbsp;<a
+                href="/index.xml"
+                target="_blank"
+                >RSS</a
+              >
+            </li>
+            <li class="toctree-l1">
+              <span class="fa"></span>&nbsp;<a
+                href="https://github.com/flaport"
+                >GitHub</a
+              >
+            </li>
+            <li class="toctree-l1">
+              <span class="fa"></span>&nbsp;<a
+                href="https://twitter.com/florislaporte"
+                >Twitter</a
+              >
+            </li>
+            <li class="toctree-l1">
+              <span class="fa"></span>&nbsp;<a
+                href="https://linkedin.com/in/florislaporte"
+                >Linked in</a
+              >
+            </li>
+            <li class="toctree-l1">
+              <span class="fa" style="font-size: 72%;"></span>&nbsp;<a
+                href="https://www.photonics.intec.ugent.be/contact/people.asp?ID=424"
+                >Academic&nbsp;Profile</a
+              >
+            </li>
+            <li class="toctree-l1">
+              <span class="fa" style="font-size: 72%;"></span>
+              &nbsp;<a href="/sitemap.xml">Sitemap</a>
+            </li>
+            <div style="padding-top: 2em;">
+              <span class="fa"></span> Floris Laporte 2020
+              <a
+                href="/static/js/javascript.html"
+                rel="jslicense"
+                style="display: none;"
+              >
+                view javascript licenses</a
+              >
+            </div>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <script src="/static/js/localdates.js"></script>
+    <script src="/static/js/externallinks.js"></script>
+    <script src="/static/js/toggledarkmode.js"></script>
+    
+    <script
+      id="MathJax-script"
+      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+      async
+    ></script>
+    
+  </body>
+</html>

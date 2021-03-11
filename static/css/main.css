@@ -1,14 +1,13 @@
 div.sidebarwrapper {
-  padding: 10px 5px 0 10px;
+  padding: 0 5px 0 10px;
 }
 
 div.sidebar {
   float: left;
   width: 230px;
   margin-left: -100%;
-  font-size: 90%;
   word-wrap: break-word;
-  padding: 15px 0 0 0;
+  padding: 0 0 0 0;
   overflow-wrap: break-word;
 }
 
@@ -24,12 +23,6 @@ div.sidebar ul ul {
 div.sidebar ul ul {
   margin-top: 0;
   margin-bottom: 0;
-}
-
-div.sidebar input {
-  border: 1px solid #98dbcc;
-  font-family: sans-serif;
-  font-size: 1em;
 }
 
 img {
@@ -62,10 +55,6 @@ li > p:last-child {
   margin-bottom: 0;
 }
 
-.optional {
-  font-size: 1.3em;
-}
-
 pre {
   overflow: auto;
   overflow-y: hidden;
@@ -86,8 +75,6 @@ h4 code {
 }
 
 body {
-  font-family: Georgia, serif;
-  font-size: 17px;
   margin: 0;
   padding: 0;
 }
@@ -108,7 +95,6 @@ div.content {
 
 div.sidebar {
   width: 220px;
-  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -133,17 +119,9 @@ div.sidebarwrapper h1.logo {
   text-align: left;
 }
 
-div.sidebar h3,
-div.sidebar h4 {
-  font-family: Georgia, serif;
-  font-size: 24px;
-  font-weight: normal;
+div.sidebar h3 {
   margin: 0 0 5px 0;
   padding: 0;
-}
-
-div.sidebar h4 {
-  font-size: 20px;
 }
 
 div.sidebar p {
@@ -155,18 +133,10 @@ div.sidebar ul {
   padding: 0;
 }
 
-div.sidebar input {
-  border: 1px solid #ccc;
-  font-family: Georgia, serif;
-  font-size: 1em;
-}
-
 div.content h1,
 div.content h2,
 div.content h3,
 div.content h4 {
-  font-family: Georgia, serif;
-  font-weight: normal;
   margin: 30px 0 10px 0;
   padding: 0;
 }
@@ -174,36 +144,11 @@ div.content h4 {
 div.content h1 {
   margin-top: 0;
   padding-top: 0;
-  font-size: 240%;
-}
-div.content h2 {
-  font-size: 180%;
-}
-div.content h3 {
-  font-size: 150%;
-}
-div.content h4 {
-  font-size: 130%;
 }
 
 div.content p,
 div.content li {
   line-height: 1.4em;
-}
-
-div.error {
-  background-color: #fcc;
-  border: 1px solid #faa;
-  -moz-box-shadow: 2px 2px 4px #d52c2c;
-  -webkit-box-shadow: 2px 2px 4px #d52c2c;
-  box-shadow: 2px 2px 4px #d52c2c;
-}
-
-pre,
-code {
-  font-family: "Consolas", "Menlo", "DejaVu Sans Mono",
-    "Bitstream Vera Sans Mono", monospace;
-  font-size: 0.9em;
 }
 
 ul {
@@ -212,7 +157,6 @@ ul {
 }
 
 pre {
-  background: #eee;
   padding: 7px 30px;
   margin: 15px 0;
   line-height: 1.3em;
@@ -264,6 +208,10 @@ a[target="_blank"] {
   background: url(/static/img/external-link.svg) center right no-repeat;
   padding-right: 0.7em;
 }
+.sidebar a[target="_blank"] {
+  background: none;
+  padding-right: 0;
+}
 a:link {
   text-decoration: none;
 }
@@ -284,20 +232,16 @@ a.anchor-link:hover {
 }
 a.tag {
   padding: 0px 1px 0px 1px;
-  font-size: 14px;
 }
 a.tag:hover {
   padding: 0px 0px 0px 0px;
-  font-size: 14px;
 }
 span.currenttag {
   padding: 0px 1px 0px 1px;
-  font-size: 14px;
 }
 span.currenttag:hover {
   cursor: default;
   padding: 0px 1px 0px 1px;
-  font-size: 14px;
 }
 .tooltip {
   position: relative;
